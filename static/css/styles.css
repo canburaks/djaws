@@ -1,0 +1,105 @@
+body {
+background-repeat:no-repeat;
+background-size:100%;
+}
+
+.auth-container {
+  margin-top: 80px;
+  color: white;
+}
+.progress {
+    height: 80px;
+}
+  .progress > svg {
+    height: 100%;
+    display: block;
+}
+
+.ui.item.search {
+  margin-right: 60px;
+}
+.twelve.wide.column {
+    display: -webkit-box;
+    display: flex;
+
+    -webkit-box-orient: vertical;
+    flex-direction: column;
+
+
+    box-sizing: border-box;
+}
+
+#pagination {
+  margin: 20px;
+  align-content: center;
+}
+
+
+a#child.card{
+  max-height: 173px;
+  max-width: 116px;
+}
+
+#child {
+  background-color: rgba(255, 255, 255, 0);
+  border-radius: 10px;
+  box-shadow: -1vmin 2vmin 3vmin rgba(0, 0, 0, 0.9);
+  height: 173px;
+  width: 116px;
+}
+div#img.image {
+
+    height: 173px;
+    width: 116px;
+}
+
+img#thumb {
+
+  height: 173px;
+  width: 116px;
+}
+
+
+
+a.item {
+    background-color: rgba(255, 255, 255, 0);
+}
+
+}
+#movie-header p {
+  position: absolute;
+  right: 100px;
+  height: 250px;
+
+}
+
+div#detail {
+
+border-radius: 10px;
+box-shadow: 0vmin 0vmin 10vmin rgba(0, 0, 20, 0.9);
+padding: 20px;
+margin-top:10px;
+
+color: white;
+}
+
+
+
+
+.ui.segment {
+  border: 1px solid #ccc;
+  border-radius: 20px;
+}
+
+}
+#bbuttons {
+    position: absolute;
+    height:45px;
+    width:100px;
+    bottom: 0;
+}
+
+#container {
+    width: 90px;
+    height: 45px;
+}

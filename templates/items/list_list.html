@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+  {% load static %}
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <!-- Add additional CSS in static file -->
+    <!--link rel="stylesheet" type="text/css" href="{% static 'css/styles.css' %}"-->
+    <link rel="stylesheet" href="{% static 'css/styles.css' %}">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.1.0/jquery.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/semantic-ui@2.3.3/dist/semantic.min.css">
+    <link rel="icon" type="image/png" href="{% static 'images/favicon.ico' %}">
+
+    <!--script src="{% static 'js/lodash.js' %}"></script-->
+
+    <body style=" background: url('{% static 'images/background.png' %}'); background-size:100%;">
+      <div class="">
+        <h1>Home</h1>
+
+      </div>
+
+  </body>
+</html>

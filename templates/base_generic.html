@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+  {% load static %}
+  <head>
+    <!-- Global Site Etiketi (gtag.js) - Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=GA_TRACKING_ID"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+
+      gtag('config', 'GA_TRACKING_ID');
+    </script>
+    
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <!-- Add additional CSS in static file -->
+    <!--link rel="stylesheet" type="text/css" href="{% static 'css/styles.css' %}"-->
+    <link rel="stylesheet" href="{% static 'css/styles.css' %}">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.1.0/jquery.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/semantic-ui@2.3.3/dist/semantic.min.css">
+    <link rel="icon" type="image/png" href="{% static 'images/favicon.ico' %}">
+
+    <!--script src="{% static 'js/lodash.js' %}"></script-->
+
+    <body style=" background: url('{% static 'images/background.png' %}'); background-size:100%;">
+
+      <div class="ui  centered grid">
+
+        {% include "top_nav.html" %}
+        {% include "toplist.html" %}
+
+        <div class="twelve wide column">
+          {% block content %}{% endblock %}
+
+          {% block pagination %}
+            {% if is_paginated %}
+              <div class="ui pagination menu" id="pagination">
+                {% if page_obj.has_previous %}
+                  <a class="item" href="{{ request.path }}?page={{ page_obj.previous_page_number }}">previous</a>
+                {% endif %}
+                <a class="active item" href="href">{{ page_obj.number }}
+                  of
+                  {{ page_obj.paginator.num_pages }}</a>
+                {% if page_obj.has_next %}
+                  <a class="item" href="{{ request.path }}?page={{ page_obj.next_page_number }}">next</a>
+                {% endif %}
+              {% endif %}
+            {% endblock %}
+
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    {% block javascript %}{% endblock %}
+    <!--script src="https://cdnjs.cloudflare.com/ajax/libs/progressbar.js/0.9.0/progressbar.min.js"></script-->
+    <script src="{% static 'js/main.js' %}" charset="utf-8"></script>
+    <!--script src="{% static 'js/main.js' %}"></script-->
+
+  </body>
+</html>

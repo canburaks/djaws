@@ -1,0 +1,26 @@
+{% extends "base_generic.html" %}
+<!-- {{ r.movie.poster_url }} -->
+
+{% load static %}
+{% block javascript %}{% endblock %}
+
+{% block content %}
+
+  <div class="ui big top aligned celled list" id="rateds">
+    {% for r in rates %}
+      <div class="item" id="rated">
+
+        {% if r.poster == "" %}
+          <img class="ui avatar image" src="{% static 'images/default.jpg' %}">
+        {% else %}
+          <img class="ui avatar image" src="{{ r.poster.url }}">
+        {% endif %}
+
+        <div class="content">
+          <a class="header" href="{{ r.get_absolute_url }}">{{ r.name}}</a>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+
+{% endblock %}

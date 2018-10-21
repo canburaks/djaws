@@ -1,0 +1,41 @@
+{% extends "base_generic.html" %}
+<!-- {{ r.movie.poster_url }} -->
+
+{% load static %}
+
+{% block javascript %}
+  <script type="text/javascript" src="{% static 'js/functions.js' %}"></script>
+  <script type="text/javascript">
+    let vt = {{ votes }}
+    const average = mean(vt);
+  </script>
+
+{% endblock %}
+
+{% block content %}
+  <div class="card" id="pcard">
+    <div class="ui segment">
+      <div class="ui segment">
+        <h2>{{user.username}}</h2>
+      </div>
+      <div class="ui segment">
+        <p></p>
+        <p>{{ votes }}</p>
+      </div>
+
+      <button onclick="printMean(vt), printStd(vt)">Try it</button>
+      <div class="ui segment">
+        <p id="average">AVERAGE:</p>-
+        <div id="container"></div>
+
+      </div>
+      <div class="ui segment">
+        <p id="std"></p>
+      </div>
+      <div class="ui segment">
+        <p>Bottom</p>
+      </div>
+    </div>
+  </div>
+
+{% endblock %}

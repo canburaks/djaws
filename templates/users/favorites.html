@@ -1,0 +1,15 @@
+{% extends "base_generic.html" %}
+{% load static %}
+
+{% block javascript %}{% endblock %}
+
+{% block content %}
+  {% if favorites %}
+    <p>{{ favorites }}</p>
+    <p>String:
+      {{ st }}</p>
+    <p>Integer:
+      {{ intg }}</p>
+
+  {% endif %}
+{% endblock %}

@@ -1,0 +1,58 @@
+{% extends "base_generic.html" %}
+{% load static %}
+
+{% block javascript %}{% endblock %}
+
+{% block content %}
+  <div class="ui divided items" id="detail">
+    <div class="item">
+      <div class="image" id="img">
+        {% if movie.poster == "" %}
+          <img id="thumb" src="{% static 'images/default.jpg' %}">
+        {% else %}
+          <img id="thumb" src="{{ movie.poster.url }}">
+        {% endif %}
+      </div>
+      <div class="content">
+        <a class="header">{{ movie.name }}</a>
+        <div class="meta">
+          <span class="cinema">Year:{{ movie.year }}</span>
+        </div>
+        <div class="description">
+          <p>{{ movie.summary }}</p>
+        </div>
+        <div class="extra">
+          <form action="" id="rating_form" method="post">
+            {% csrf_token %}
+
+            <label for="id_rate_0">Rating:<button class="ui  basic mini button" name="rate" id="currentRate">{{ oldr }}</button>
+            </label>
+            <div class="ui  basic segment" style="width:80%;">
+              <button class="ui  basic mini red button" name="rate" value="1.0">1.0</button>
+              <button class="ui  basic mini red button" name="rate" value="1.5">1.5</button>
+              <button class="ui  basic mini orange button" name="rate" value="2.0">2.0</button>
+              <button class="ui  basic mini yellow button" name="rate" value="2.5">2.5</button>
+              <button class="ui  basic mini olive button" name="rate" value="3.0">3.0</button>
+              <button class="ui  basic mini green button" name="rate" value="3.5">3.5</button>
+              <button class="ui  basic mini teal button" name="rate" value="4.0">4.0</button>
+              <button class="ui  basic mini blue button" name="rate" value="4.5">4.5</button>
+              <button class="ui  basic mini violet button" name="rate" value="5.0">5.0</button>
+
+            </div>
+          </form>
+        </div>
+
+        <div class="preds">
+          <div>
+            <button class="ui button" id="predict-button">
+              Predict
+            </button>
+            <p id="prediction-result">We're fetching that content for you.</p>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+  {% endblock %}
+  <!-- Card 2: Back to the Future -->

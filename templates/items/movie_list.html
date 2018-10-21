@@ -1,0 +1,29 @@
+{% extends "base_generic.html" %}
+{% load static %}
+
+{% block content %}
+
+  {% if movie_list %}
+
+    <div id="movie-list" class="ui eight  centered  cards ">
+      {% for movie in movie_list %}
+
+        <a id="child" class="card" href="{{ movie.get_absolute_url }}" title="ID:{{ movie.id }} {{ movie.name }} ({{ movie.year }}) (Imdb:{{ movie.imdb_rating }})">
+          <div class="image" id="img">
+            {% if movie.poster == "" %}
+              <img id="thumb" src="{% static 'images/default.jpg' %}" alt="{{ movie.name }} poster">
+            {% else %}
+              <img id="thumb" src="{{ movie.poster.url }}" >
+            {% endif %}
+          </div>
+
+        </a>
+
+      {% endfor %}
+    </div>
+
+  {% else %}
+    <p>There are no movies in the library.</p>
+  {% endif %}
+
+{% endblock %}

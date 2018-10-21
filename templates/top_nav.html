@@ -1,0 +1,20 @@
+<div class="ui  inverted fixed mini menu" id="menuDIV">
+
+  <a class="teal item" href="{% url 'dashboard' %}" id="mainpage">Discovery</a>
+  <a class="violet item" href="{% url 'movies' %}" id="moviepage">
+    <i class="video camera icon" title="Movies"></i>Movies
+  </a>
+
+  <div class="right  stackable menu">
+
+    <form action="{% url 'movie-search' %}" method="get" accept-charset="utf-8">
+      <div class=" ui  item  search">
+        <div class="ui icon input">
+          <i class="search icon"></i>
+          <input class="submit" type="text" placeholder="Search" id="t" name="q">
+        </div>
+      </div>
+    </form>
+
+  </div>
+</div>

@@ -1,0 +1,24 @@
+{% if user.is_authenticated %}
+  <div class="ui vertical stackable fluid menu" id="pcard">
+    <dl>
+      <dt class="item" id="pcard_username">
+        <b>{{ user.username }}</b>
+      </dt>
+
+      <a class="item" href="{% url 'ratings' %}" title="Your Rated Items">My Movies
+        <div class="ui teal left pointing label">{{ user.profile.points }}</div>
+      </a>
+
+      <a class="item" href="">
+        Favorites
+        <div class="ui label">{{ user.profile.favs|length}}</div>
+      </a>
+
+      <a class="item" href="">
+        Badges
+        <div class="ui label">1</div>
+      </a>
+
+    </div>
+
+  {% endif %}

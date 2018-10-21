@@ -1,0 +1,62 @@
+{% extends "base_generic.html" %}
+{% load static %}
+
+{% block content %}
+
+  <div class="calc-container">
+
+    <div class="ui segments" id="calc-segment">
+      <div class="ui segment">
+        <p>Profile:{{ user.username }}</p>
+      </div>
+      <button class="ui red button" name="rate" value="1" id="red">1.0</button>
+      <button class="ui orange button" name="rate" value="2">2.0</button>
+      <div class="ui red segment">
+        <p>Rated Movies:</br>{{ movielist }}</p>
+    </div>
+    <div class="ui blue segment">
+      <p>Votes:</br>{{ votes }}</p>
+  </div>
+  <div class="ui green segment">
+    <p>Middle</p>
+  </div>
+  <div class="ui yellow segment">
+    <p>{{ votes }}</p>
+  </div>
+  <div class="ui yellow segment">
+    <p>TargetMovieVotes:</p>
+    <p id="target-movie"></p>
+  </div>
+  <div class="ui green segment">
+    <p>Commons</p>
+  </br>
+  <p id="commons"></p>
+</div>
+<input type="text" required="" name="username" maxlength="150" id="id_username" autofocus="">
+</div>
+
+<script type="text/javascript">
+var ur = "{{ validate_username }}"
+
+$("#red").click(function () {
+  var iid = $(this).val();
+
+  $.ajax({
+    url: "{% url 'validate_username' %}",
+    method: "get",
+    data: {
+      csrfmiddlewaretoken: "{{ csrf_token }}",
+      'iid': iid
+    },
+    dataType: 'json',
+    success: function (data) {
+      if (data.summary) {
+        console.log("Done");
+        alert(parseFloat(data.summary));
+      }
+    }
+  });
+
+});
+</script>
+{% endblock %}

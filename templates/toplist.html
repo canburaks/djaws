@@ -1,0 +1,60 @@
+{% if user.is_authenticated %}
+  <div class="ui  inverted listeler five item mini menu" style="margin-top:50px;">
+
+    <a class="violet item" href="{% url 'movies'  %}" id="editorschoicepage">
+      Our Selections
+    </a>
+
+    <a class="blue item" href="{% url 'imdb250'  %}" id="imdbpage">
+      IMDB 250
+    </a>
+    <a class="teal item" href="{% url 'allmovies' %}" id="allmoviespage">
+      All Movies
+    </a>
+
+    <a class="item" href="{% url 'ratings' %}">
+      My Movies
+      <div class="ui teal left pointing label">{{ user.profile.points }}</div>
+    </a>
+
+    <a class="item" href="{% url 'logout'  %}">
+      Log Out
+    </a>
+  </div>
+{% else %}
+  <div class="ui   listeler  two item mini inverted menu" style="margin-top:60px;">
+
+    <a class="active teal item" href="{% url 'login' %}" id="loginpage">
+      Sign In
+    </a>
+    <a class="active violet item" href="{% url 'signup' %}" id="signuppage">
+      Sign Up
+    </a>
+  </div>
+{% endif %}
+<script type="text/javascript">
+  function activeMenu() {
+  var url = window.location.href;
+  if (url.includes("dashboard")) {
+    let element = document.getElementById("editorschoicepage");
+    element.classList.add("active");
+  }
+  else if (url.includes("editor")) {
+    let element = document.getElementById("editorschoicepage");
+    element.classList.add("active");
+  }
+  else if (url.endsWith("com")) {
+    let element0 = document.getElementById("editorschoicepage");
+    element0.classList.add("active");
+  }
+  else if (url.includes("movies/movies/")) {
+    let element = document.getElementById("allmoviespage");
+    element.classList.add("active");
+  }
+  else if (url.includes("imdb")) {
+    let element = document.getElementById("imdbpage");
+    element.classList.add("active");
+  }
+}
+activeMenu()
+</script>

@@ -1,0 +1,25 @@
+{% extends "base_generic.html" %}
+{% block title %}Log-in{% endblock %}
+
+{% block content %}
+
+  {% if form.errors %}
+    <p class="error">Sorry, that's not a valid username or password</p>
+  {% endif %}
+  <div class="auth-container">
+
+    <form class="pure-form" action="" method="post">
+      {% csrf_token %}
+      <fieldset>
+        <legend>Please login to see that page</legend>
+        <label for="username">Username:</label>
+        <input type="text" name="username" value="" id="username" placeholder="username">
+        <label for="password">Password:</label>
+        <input type="password" name="password" value="" id="password" placeholder="Password">
+
+        <button type="submit" value="login" class="pure-button pure-button-primary">Sign in</button>
+        <input type="hidden" name="next" value="{{ NEXT }}"/>
+      </fieldset>
+    </form>
+  </div>
+{% endblock %}
