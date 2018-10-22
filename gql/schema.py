@@ -9,6 +9,7 @@ import graphql_jwt
 from graphql_jwt.decorators import login_required
 from graphene_django.types import DjangoObjectType
 from graphene_django.converter import convert_django_field
+from graphene_django.filter import DjangoFilterConnectionField
 
 @convert_django_field.register(JSONField)
 def convert_json_field_to_string(field, registry=None):
@@ -17,21 +18,31 @@ def convert_json_field_to_string(field, registry=None):
 
 class MovieType(DjangoObjectType):
     image = graphene.String() #for property types
+    pic = graphene.String()
+    isBookmarked = graphene.Boolean()
+    viewer_rating = graphene.Float()
     
     class Meta:
         model = Movie
 
-    """
-    def resolve_poster(self, *_):
-        if self.poster:
-            return '{}{}'.format(settings.MEDIA_URL, self.poster)
-        else:
-            return """
+    def resolve_isBookmarked(self,info, *_):
+        if info.context.user.is_authenticated:
+            return True
+        return False
+    
+    def resolve_viewer_rating(self, info, *_):
+        if info.context.user.is_authenticated:
+            user= info.context.user
+            return user.profile.ratings.get(str(self.id))
+        
 
 class ProfileType(DjangoObjectType):
     token = graphene.String()
+    ratings = graphene.types.json.JSONString()
     class Meta:
         model = Profile
+    def resolve_ratings(self, info, *_):
+        return self.ratings
 
 class PersonType(DjangoObjectType):
     class Meta:
@@ -50,6 +61,18 @@ class Query(graphene.ObjectType):
     movie = graphene.Field(MovieType,id=graphene.Int(),name=graphene.String())
 
     all_profiles = graphene.List(ProfileType)
+    viewer = graphene.Field(UserType)
+
+    def resolve_viewer(self, info, **kwargs):
+        user = info.context.user
+        if not user.is_authenticated:
+            raise Exception('Authentication credentials were not provided')
+        if info.context.user.is_authenticated:
+            user = info.context.user
+            return user
+
+
+
 
 
     def resolve_all_movies(self, info, **kwargs):

@@ -13,9 +13,10 @@ from django.views import generic
 from items.models import List
 
 
-class HomeList( generic.ListView):
+class HomeList(generic.ListView):
     model = List
     context_object_name = 'movie_list'
     #queryset = List.objects.get(id=1).movies.all()
     template_name = 'items/list_list.html'
     paginate_by = 40
+

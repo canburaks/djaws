@@ -41,7 +41,7 @@ class Dummy(models.Model):
     def greatDict(cls, movid):
         "Bring users that rated target movie and their all votes"
         from items.models import Movie
-        userList = Movie.objects.get(id=movid).ratings
+        userList = Movie.objects.get(id=movid).ratings_user
         #dic = {key:cls.Votes.get(key) for key in userList if cls.Votes.get(key)}
         dic = {key:cls.Votes.get(key) for key in userList}
         "{'key': {2571:4.0}, ... }"

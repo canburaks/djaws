@@ -3,7 +3,6 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.db.models.signals import post_save
 from django_mysql.models import JSONField
-
 JOB = (
     ('d', 'Director'),
     ('a', 'Actor/Actress'),
@@ -20,7 +19,8 @@ class Profile(models.Model):
     joined = models.DateField(null=True, blank=True)
     born = models.DateField(null=True, blank=True)
     is_premium = models.BooleanField(default=False)
-    ratings = JSONField(default=dict,blank=True, null=True)
+    ratings = JSONField(default=dict)
+    bookmarks = models.ManyToManyField("items.Movie", related_name="bookmarked")
     #bookmarks = models.ManyToManyField("items.Movie")
 
     def __str__(self):
@@ -36,12 +36,26 @@ class Profile(models.Model):
         return did
 
     def rate(self,target, rate, item="Movie"):
-        if item=="Movie":
             movid = target.id
-            self.ratings["movie"].update({int(movid):rate})
+            self.ratings.update({int(movid):float(rate)})
+            target.ratings_user.add(self.id)
             self.save()
+            target.save()
             print("Rate Added")
 
+
+    def isBookmarked(self,target):
+        return target in self.bookmarks.all()
+
+    def bookmarking(self, target, item="Movie"):
+        if item=="Movie":
+            if target not in self.bookmarks.all():
+                self.bookmarks.add(target)
+                self.save()
+            elif target in self.bookmarks.all():
+                self.bookmarks.remove(target)
+                self.save()
+            return self.isBookmarked(target)
 
 
     def predict(self, target, **kwargs):
@@ -78,7 +92,7 @@ class Person(models.Model):
 
     bio = models.CharField(max_length=1000, null=True)
     job = models.CharField(max_length=len(JOB), choices=JOB, null=True)
-    
+    pictures = models.ImageField(blank=True, upload_to="person/pictures/")
 
     born = models.DateField(null=True, blank=True)
     died = models.DateField(null=True, blank=True)

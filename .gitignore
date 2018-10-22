@@ -4,11 +4,11 @@ __pycache__/
 *$py.class
 
 # C extensions
-*.so
+#*.so
 
 # Distribution / packaging
 .Python
-build/
+#build/
 develop-eggs/
 dist/
 downloads/
@@ -73,7 +73,7 @@ target/
 .ipynb_checkpoints
 
 # pyenv
-.python-version
+#.python-version
 
 # celery beat schedule file
 celerybeat-schedule
@@ -102,3 +102,8 @@ venv.bak/
 
 # mypy
 .mypy_cache/
+
+# Elastic Beanstalk Files
+#.elasticbeanstalk/*
+#!.elasticbeanstalk/*.cfg.yml
+3!.elasticbeanstalk/*.global.yml

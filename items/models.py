@@ -1,7 +1,7 @@
 from django.db import models
 from persons.models import Person, Profile
 from django.urls import reverse
-from django_mysql.models import JSONField,SetTextField, ListCharField
+from django_mysql.models import JSONField,SetTextField, ListCharField,SetCharField
 
 # Create your models here.
 class List(models.Model):
@@ -14,7 +14,8 @@ class List(models.Model):
     def __str__(self):
         return self.name
 
-
+    class Meta:
+        ordering = ["-id"]
 class Movie(models.Model):
     id = models.IntegerField(primary_key=True)
     imdb_id = models.CharField(max_length=9, null=True)
@@ -27,9 +28,14 @@ class Movie(models.Model):
     imdb_rating = models.DecimalField(max_digits=3, decimal_places=2, blank=True, null=True)
     poster = models.ImageField(blank=True, upload_to="posters/")
 
+    director = models.ForeignKey(Person, on_delete=models.CASCADE, null=True, related_name="movies")
+    actors = models.ForeignKey(Person, on_delete=models.CASCADE, null=True, related_name="acted")
+    
     tags = SetTextField(default=set(), base_field=models.CharField(max_length=15))
     data = JSONField(default=dict)
-
+    ratings_user = SetCharField(default=set(),max_length=15, base_field=models.IntegerField())
+    ratings_dummy = SetCharField(default=set(),max_length=15, base_field=models.CharField(max_length=15))
+    
     @property
     def shortName(self):
         if len(self.name)>10:
@@ -115,8 +121,8 @@ class Video(models.Model):
     link = models.URLField()
     duration = models.IntegerField(null=True, help_text="seconds")
 
-    related_persons = models.ManyToManyField(Person, blank=True)
-    related_movies = models.ManyToManyField(Movie, blank=True)
+    related_persons = models.ManyToManyField(Person, blank=True, related_name="videos")
+    related_movies = models.ManyToManyField(Movie, blank=True, related_name="videos")
 
     def __str__(self):
         return self.title

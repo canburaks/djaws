@@ -124,7 +124,7 @@ else:
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.mysql',
-            "HOST": "cbs-dra-02.ckdygqzbqwca.eu-west-2.rds.amazonaws.com",
+            "HOST": "cbs-dra-03.ckdygqzbqwca.eu-west-2.rds.amazonaws.com",
             'NAME': 'dra',
             'USER': "canburaks",
             'PASSWORD':"06301987Cbs",
