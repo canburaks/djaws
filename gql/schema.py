@@ -39,11 +39,17 @@ class MovieType(DjangoObjectType):
 class ProfileType(DjangoObjectType):
     token = graphene.String()
     ratings = graphene.types.json.JSONString()
+    len_bookmarks = graphene.Int()
+    len_ratings = graphene.Int()
     class Meta:
         model = Profile
     def resolve_ratings(self, info, *_):
         return self.ratings
-
+    
+    def resolve_len_bookmarks(self, info):
+        return self.bookmarks.count()
+    def resolve_len_ratings(self, info):
+        return len(self.ratings)
 class PersonType(DjangoObjectType):
     class Meta:
         model = Person
@@ -56,9 +62,8 @@ class UserType(DjangoObjectType):
         return graphql_jwt.shortcuts.get_token(self)
 
 
-
 class Query(graphene.ObjectType):
-
+    viewer = graphene.Field(ProfileType, username=graphene.String())
     all_movies = graphene.List(MovieType)
     lists = graphene.List(MovieType, 
         id=graphene.Int(default_value=None), 
@@ -74,7 +79,15 @@ class Query(graphene.ObjectType):
     )
     movie = graphene.Field(MovieType,id=graphene.Int(),name=graphene.String())
     all_profiles = graphene.List(ProfileType)
-    viewer = graphene.Field(UserType)
+
+    def resolve_viewer(self, info, **kwargs):
+        user = info.context.user
+        if not user.is_authenticated:
+            raise Exception('Authentication credentials were not provided')
+        if info.context.user.is_authenticated:
+            user = info.context.user
+            profile = user.profile
+            return profile
 
     def resolve_length(self, info, **kwargs):
         id = kwargs.get("id")
@@ -83,8 +96,8 @@ class Query(graphene.ObjectType):
 
         if id is not None:
             if id==0:
-                result = Movie.objects.all().count()
-                return result
+                result = Movie.objects.all()[:5000]
+                return result.count()
                 
             result = List.objects.get(id=id).movies.all().count()
             return result
@@ -110,13 +123,7 @@ class Query(graphene.ObjectType):
             return result
 
 
-    def resolve_viewer(self, info, **kwargs):
-        user = info.context.user
-        if not user.is_authenticated:
-            raise Exception('Authentication credentials were not provided')
-        if info.context.user.is_authenticated:
-            user = info.context.user
-            return user
+
 
     def resolve_all_movies(self, info, **kwargs):
         return Movie.objects.all().order_by("-year")[:1000]
@@ -130,7 +137,7 @@ class Query(graphene.ObjectType):
         skip = kwargs.get("skip")
         if id is not None:
             if id==0:
-                result = Movie.objects.all()
+                result = Movie.objects.all().order_by("-year")
                 if skip:
                     result = result[skip::]
                 if first:
