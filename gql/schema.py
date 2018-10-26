@@ -10,7 +10,7 @@ from graphql_jwt.decorators import login_required
 from graphene_django.types import DjangoObjectType
 from graphene_django.converter import convert_django_field
 from graphene_django.filter import DjangoFilterConnectionField
-
+from django.db.models import Q
 @convert_django_field.register(JSONField)
 def convert_json_field_to_string(field, registry=None):
     return graphene.String()
@@ -21,7 +21,7 @@ class MovieType(DjangoObjectType):
     pic = graphene.String()
     isBookmarked = graphene.Boolean()
     viewer_rating = graphene.Float()
-    
+
     class Meta:
         model = Movie
 
@@ -29,12 +29,12 @@ class MovieType(DjangoObjectType):
         if info.context.user.is_authenticated:
             return True
         return False
-    
+
     def resolve_viewer_rating(self, info, *_):
         if info.context.user.is_authenticated:
             user= info.context.user
             return user.profile.ratings.get(str(self.id))
-        
+
 
 class ProfileType(DjangoObjectType):
     token = graphene.String()
@@ -49,19 +49,66 @@ class PersonType(DjangoObjectType):
         model = Person
 
 class UserType(DjangoObjectType):
-    
+
     class Meta:
         model = get_user_model()
     def resolve_token(self, info, **kwargs):
         return graphql_jwt.shortcuts.get_token(self)
 
-class Query(graphene.ObjectType):
-    all_movies = graphene.List(MovieType)
-    lists = graphene.List(MovieType, id=graphene.Int(), name=graphene.String())
-    movie = graphene.Field(MovieType,id=graphene.Int(),name=graphene.String())
 
+
+class Query(graphene.ObjectType):
+
+    all_movies = graphene.List(MovieType)
+    lists = graphene.List(MovieType, 
+        id=graphene.Int(default_value=None), 
+        name=graphene.String(default_value=None),
+        search=graphene.String(default_value=None),
+        first=graphene.Int(default_value=None),
+        skip=graphene.Int(default_value=None)
+        )
+    length = graphene.Int(
+        id=graphene.Int(default_value=None), 
+        name=graphene.String(default_value=None),
+        search=graphene.String(default_value=None)
+    )
+    movie = graphene.Field(MovieType,id=graphene.Int(),name=graphene.String())
     all_profiles = graphene.List(ProfileType)
     viewer = graphene.Field(UserType)
+
+    def resolve_length(self, info, **kwargs):
+        id = kwargs.get("id")
+        name = kwargs.get("name")
+        search = kwargs.get("search")
+
+        if id is not None:
+            if id==0:
+                result = Movie.objects.all().count()
+                return result
+                
+            result = List.objects.get(id=id).movies.all().count()
+            return result
+
+        if name is not None:
+            user = info.context.user
+            if user.is_authenticated:
+                if name=="ratings":
+                    profile_ratings = user.profile.ratings.keys()
+                    return Movie.objects.filter(id__in=profile_ratings).count()
+                if name=="bookmarks":
+                    result = user.profile.bookmarks.all().count()
+                    return result
+            else :
+                raise Exception('Authentication credentials were not provided')
+
+        if search:
+            filter = (
+                Q(name__icontains=search) 
+                #| Q(summary__icontains=search)
+            )
+            result = Movie.objects.filter(filter).count()
+            return result
+
 
     def resolve_viewer(self, info, **kwargs):
         user = info.context.user
@@ -71,24 +118,66 @@ class Query(graphene.ObjectType):
             user = info.context.user
             return user
 
-
-
-
-
     def resolve_all_movies(self, info, **kwargs):
         return Movie.objects.all().order_by("-year")[:1000]
 
+    #@login_required
     def resolve_lists(self, info, **kwargs):
         id = kwargs.get("id")
         name = kwargs.get("name")
-
+        search = kwargs.get("search")
+        first = kwargs.get("first")
+        skip = kwargs.get("skip")
         if id is not None:
             if id==0:
-                return Movie.objects.all().order_by("-year")[:1000]
-            return List.objects.get(id=id).movies.all().order_by("imdb_rating")
+                result = Movie.objects.all()
+                if skip:
+                    result = result[skip::]
+                if first:
+                    result = result[:first]
+                return result
+                
+            result = List.objects.get(id=id).movies.all().order_by("imdb_rating")
+
+            if skip:
+                result = result[skip::]
+            if first:
+                result = result[:first]
+            return result
+
         if name is not None:
-            return List.objects.get(name=name).movies.all()
-        return Movie.objects.all().order_by("-year")[:1000]
+            user = info.context.user
+            if user.is_authenticated:
+                if name=="ratings":
+                    profile_ratings = user.profile.ratings.keys()
+                    result = Movie.objects.filter(id__in=profile_ratings)
+                    if skip:
+                        result = result[skip::]
+                    if first:
+                        result = result[:first]
+                    return result
+                if name=="bookmarks":
+                    result = user.profile.bookmarks.all()
+                    if skip:
+                        result = result[skip::]
+                    if first:
+                        result = result[:first]
+                    return result
+            else :
+                raise Exception('Authentication credentials were not provided')
+
+        if search:
+            filter = (
+                Q(name__icontains=search) 
+                #| Q(summary__icontains=search)
+            )
+            result = Movie.objects.filter(filter)
+            if skip:
+                result = result[skip::]
+            if first:
+                result = result[:first]
+            return result
+
 
     def resolve_movie(self, info, **kwargs):
         id = kwargs.get("id")
@@ -102,8 +191,6 @@ class Query(graphene.ObjectType):
 
     def resolve_all_profiles(self, info, **kwargs):
         return Profile.objects.all()
-
-
 
 
 class CreateUser(graphene.Mutation):
@@ -129,11 +216,21 @@ class CreateUser(graphene.Mutation):
 
 
 
+class ObtainJSONWebToken(graphql_jwt.JSONWebTokenMutation):
+    user = graphene.Field(UserType)
+
+    @classmethod
+    def resolve(cls, root, info):
+        return cls(user=info.context.user)
+
+
+
 class Mutation(graphene.ObjectType):
     create_user = CreateUser.Field()
-    token_auth = graphql_jwt.ObtainJSONWebToken.Field()
+    token_auth = ObtainJSONWebToken.Field()
     verify_token = graphql_jwt.Verify.Field()
     refresh_token = graphql_jwt.Refresh.Field()
+
 
 
 schema = graphene.Schema(query=Query, mutation=Mutation)
