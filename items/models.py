@@ -1,7 +1,7 @@
 from django.db import models
 from persons.models import Person, Profile
 from django.urls import reverse
-from django_mysql.models import JSONField,SetTextField, ListCharField,SetCharField
+from django_mysql.models import JSONField, SetTextField, ListCharField, SetCharField
 
 # Create your models here.
 class List(models.Model):
@@ -16,6 +16,12 @@ class List(models.Model):
 
     class Meta:
         ordering = ["-id"]
+
+
+def item_image_upload_path(instance, filename):
+    return "posters/{0}/{1}".format(instance.movie.id,filename)
+
+
 class Movie(models.Model):
     id = models.IntegerField(primary_key=True)
     imdb_id = models.CharField(max_length=9, null=True)
@@ -27,14 +33,13 @@ class Movie(models.Model):
 
     imdb_rating = models.DecimalField(max_digits=3, decimal_places=2, blank=True, null=True)
     poster = models.ImageField(blank=True, upload_to="posters/")
-
-    director = models.ForeignKey(Person, on_delete=models.CASCADE, null=True, related_name="movies")
-    actors = models.ForeignKey(Person, on_delete=models.CASCADE, null=True, related_name="acted")
+    director = models.ForeignKey(Person, on_delete=models.CASCADE, null=True,blank=True, related_name="movies")
+    actors = models.ForeignKey(Person, on_delete=models.CASCADE, null=True,blank=True, related_name="acted")
     
-    tags = SetTextField(default=set(), base_field=models.CharField(max_length=15))
+    tags = SetTextField(default=set(), base_field=models.CharField(max_length=15), null=True, blank=True)
     data = JSONField(default=dict)
-    ratings_user = SetCharField(default=set(),max_length=15, base_field=models.IntegerField())
-    ratings_dummy = SetCharField(default=set(),max_length=15, base_field=models.CharField(max_length=15))
+    ratings_user = SetCharField(default=set(),max_length=15, base_field=models.IntegerField(),null=True, blank=True)
+    ratings_dummy = SetCharField(default=set(),max_length=15, base_field=models.CharField(max_length=15),null=True, blank=True)
     
     @property
     def shortName(self):
@@ -113,13 +118,24 @@ class Movie(models.Model):
             print("could not get:",self.id, self.name, sep=",")
 
 
+class MovieImage(models.Model):
+    movie = models.ForeignKey(Movie, related_name='images', on_delete=models.CASCADE)
+    info = models.CharField(max_length=40, blank=True, null=True)
+    image = models.ImageField(blank=True, upload_to=item_image_upload_path)
+
+    def __str__(self):
+        return self.image.url
+    @property
+    def image_info(self):
+        return {"info":self.info, "url":self.image.url}
+
 class Video(models.Model):
     id = models.IntegerField(primary_key=True)
     title = models.CharField(max_length=150)
-    summary = models.CharField(max_length=2000, null=True)
+    summary = models.CharField(max_length=2000, null=True, blank=True)
 
     link = models.URLField()
-    duration = models.IntegerField(null=True, help_text="seconds")
+    duration = models.IntegerField(null=True,blank=True, help_text="seconds")
 
     related_persons = models.ManyToManyField(Person, blank=True, related_name="videos")
     related_movies = models.ManyToManyField(Movie, blank=True, related_name="videos")

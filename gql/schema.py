@@ -2,8 +2,8 @@ from django.shortcuts import render
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django_mysql.models import JSONField
-from items.models import Movie, List
-from persons.models import Person, Profile
+from items.models import Movie, List, MovieImage
+from persons.models import Person, Profile, PersonImage
 import graphene
 import graphql_jwt
 from graphql_jwt.decorators import login_required
@@ -15,9 +15,23 @@ from django.db.models import Q
 def convert_json_field_to_string(field, registry=None):
     return graphene.String()
 
+class MovieImageType(DjangoObjectType):
+    info = graphene.types.json.JSONString()
+    class Meta:
+        model= MovieImage
+    def resolve_info(self, info, *_):
+        return self.image_info
+
+class PersonImageType(DjangoObjectType):
+    info = graphene.types.json.JSONString()
+    class Meta:
+        model= PersonImage
+    def resolve_info(self, info, *_):
+        return self.image_info
 
 class MovieType(DjangoObjectType):
-    image = graphene.String() #for property types
+    poster = graphene.String()
+    images = graphene.List(MovieImageType) #for property types
     pic = graphene.String()
     isBookmarked = graphene.Boolean()
     viewer_rating = graphene.Float()
@@ -26,6 +40,13 @@ class MovieType(DjangoObjectType):
 
     class Meta:
         model = Movie
+    def resolve_poster(self, info, *_):
+        if self.poster:
+            return self.poster.url
+        return ""
+
+    def resolve_images(self,info, *_):
+        return self.images.all()
 
     def resolve_isBookmarked(self,info, *_):
         if info.context.user.is_authenticated:
@@ -57,12 +78,18 @@ class ProfileType(DjangoObjectType):
         return self.bookmarks.count()
     def resolve_len_ratings(self, info):
         return len(self.ratings)
+
 class PersonType(DjangoObjectType):
+    data = graphene.types.json.JSONString()
+    images = graphene.List(PersonImageType) #for property types
     class Meta:
         model = Person
+    def resolve_data(self,info,*_):
+        return self.data
+    def resolve_images(self,info, *_):
+        return self.images.all()
 
 class UserType(DjangoObjectType):
-
     class Meta:
         model = get_user_model()
     def resolve_token(self, info, **kwargs):
@@ -70,6 +97,9 @@ class UserType(DjangoObjectType):
 
 
 class Query(graphene.ObjectType):
+    person = graphene.Field(PersonType,
+        id=graphene.String(default_value=None),
+        name=graphene.String(default_value=None))
     viewer = graphene.Field(ProfileType, username=graphene.String())
     all_movies = graphene.List(MovieType)
     lists = graphene.List(MovieType, 
@@ -86,6 +116,17 @@ class Query(graphene.ObjectType):
     )
     movie = graphene.Field(MovieType,id=graphene.Int(),name=graphene.String())
     all_profiles = graphene.List(ProfileType)
+
+    def resolve_person(self, info, **kwargs):
+        id = kwargs.get("id")
+        name = kwargs.get("name")
+        if id is not None:
+            return Person.objects.get(id=id)
+        if name is not None:
+            try:
+                Person.objects.get(name=name)
+            except:
+                raise Exception('Person could not find')
 
     def resolve_viewer(self, info, **kwargs):
         user = info.context.user
@@ -129,9 +170,6 @@ class Query(graphene.ObjectType):
             result = Movie.objects.filter(filter).count()
             return result
 
-
-
-
     def resolve_all_movies(self, info, **kwargs):
         return Movie.objects.all().order_by("-year")[:1000]
 
@@ -144,14 +182,14 @@ class Query(graphene.ObjectType):
         skip = kwargs.get("skip")
         if id is not None:
             if id==0:
-                result = Movie.objects.all().order_by("imdb_rating")
+                result = Movie.objects.all()
                 if skip:
                     result = result[skip::]
                 if first:
                     result = result[:first]
-                return result
+                return result.order_by("-imdb_rating")
                 
-            result = List.objects.get(id=id).movies.all().order_by("imdb_rating")
+            result = List.objects.get(id=id).movies.all().order_by("-imdb_rating")
 
             if skip:
                 result = result[skip::]

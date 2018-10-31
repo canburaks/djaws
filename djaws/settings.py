@@ -75,7 +75,7 @@ AUTHENTICATION_BACKENDS = [
 ]
 JWT_VERIFY_EXPIRATION=True
 JWT_REFRESH_EXPIRATION_DELTA=70
-JWT_EXPIRATION_DELTA=3600*7
+JWT_EXPIRATION_DELTA=3600*70
 
 GRAPHENE = {
     'SCHEMA': 'gql.schema.schema', # Where your Graphene schema lives
@@ -103,6 +103,7 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'djaws.wsgi.application'
+
 
 
 # Database

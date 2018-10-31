@@ -21,6 +21,7 @@ class Profile(models.Model):
     is_premium = models.BooleanField(default=False)
     ratings = JSONField(default=dict)
     bookmarks = models.ManyToManyField("items.Movie", related_name="bookmarked")
+    follow_director = models.ManyToManyField("persons.Person", related_name="follower", blank=True)
     #bookmarks = models.ManyToManyField("items.Movie")
 
     def __str__(self):
@@ -37,7 +38,7 @@ class Profile(models.Model):
 
     def rate(self,target, rate, item="Movie"):
             movid = target.id
-            self.ratings.update({int(movid):float(rate)})
+            self.ratings.update({str(movid):float(rate)})
             target.ratings_user.add(self.id)
             self.save()
             target.save()
@@ -55,7 +56,6 @@ class Profile(models.Model):
             elif target in self.bookmarks.all():
                 self.bookmarks.remove(target)
                 self.save()
-            return self.isBookmarked(target)
 
 
     def predict(self, target, **kwargs):
@@ -78,7 +78,8 @@ class Profile(models.Model):
         return len(self.ratings["movie"])
 
 
-
+def person_image_upload_path(instance, filename):
+    return "person/{0}/pictures/{1}".format(instance.person.id,filename)
 
 class Person(models.Model):
 
@@ -91,8 +92,7 @@ class Person(models.Model):
     name = models.CharField(max_length=40)
 
     bio = models.CharField(max_length=1000, null=True)
-    job = models.CharField(max_length=len(JOB), choices=JOB, null=True)
-    pictures = models.ImageField(blank=True, upload_to="person/pictures/")
+    job = models.CharField(max_length=len(JOB), choices=JOB, null=True, blank=True)
 
     born = models.DateField(null=True, blank=True)
     died = models.DateField(null=True, blank=True)
@@ -103,8 +103,17 @@ class Person(models.Model):
 
     def __str__(self):
         return self.name
+    
+class PersonImage(models.Model):
+    person = models.ForeignKey(Person, related_name='images', on_delete=models.CASCADE)
+    info = models.CharField(max_length=40, null=True,blank=True)
+    image = models.ImageField(upload_to=person_image_upload_path)
 
-
+    def __str__(self):
+        return self.image.url
+    @property
+    def image_info(self):
+        return {"info":self.info, "url":self.image.url}
 class DirectorManager(models.Manager):
     def get_queryset(self):
         return super(DirectorManager, self).get_queryset().filter(job='d')
