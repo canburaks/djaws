@@ -21,20 +21,27 @@ class MovieType(DjangoObjectType):
     pic = graphene.String()
     isBookmarked = graphene.Boolean()
     viewer_rating = graphene.Float()
+    data = graphene.types.json.JSONString()
+    tags = graphene.types.json.JSONString()
 
     class Meta:
         model = Movie
 
     def resolve_isBookmarked(self,info, *_):
         if info.context.user.is_authenticated:
-            return True
+            user= info.context.user
+            if self in user.profile.bookmarks.all():
+                return True
         return False
 
     def resolve_viewer_rating(self, info, *_):
         if info.context.user.is_authenticated:
             user= info.context.user
             return user.profile.ratings.get(str(self.id))
-
+    def resolve_data(self,info,*_):
+        return self.data
+    def resolve_tags(self, info, *_):
+        return self.tags
 
 class ProfileType(DjangoObjectType):
     token = graphene.String()
@@ -137,7 +144,7 @@ class Query(graphene.ObjectType):
         skip = kwargs.get("skip")
         if id is not None:
             if id==0:
-                result = Movie.objects.all().order_by("-year")
+                result = Movie.objects.all().order_by("imdb_rating")
                 if skip:
                     result = result[skip::]
                 if first:
@@ -221,7 +228,33 @@ class CreateUser(graphene.Mutation):
         #token = graphql_jwt.shortcuts.get_token(user)
         return CreateUser(user=user, profile=profile)
 
+class Bookmark(graphene.Mutation):
+    user = graphene.Field(UserType)
+    movie = graphene.Field(MovieType)
+    class Arguments:
+        id = graphene.Int()
+    def mutate(self,info,id):
+        if info.context.user.is_authenticated:
+            user = info.context.user
+            profile = user.profile
+            movie = Movie.objects.get(id=id)
+            profile.bookmarking(movie)
+            return Bookmark(user=user, movie=movie)
 
+class Rating(graphene.Mutation):
+    user = graphene.Field(UserType)
+    movie = graphene.Field(MovieType)
+    class Arguments:
+        id = graphene.Int()
+        rate = graphene.Float()
+
+    def mutate(self,info,id, rate):
+        if info.context.user.is_authenticated:
+            user = info.context.user
+            profile = user.profile
+            movie = Movie.objects.get(id=id)
+            profile.rate(movie, rate)
+            return Rating(user=user, movie=movie)
 
 class ObtainJSONWebToken(graphql_jwt.JSONWebTokenMutation):
     user = graphene.Field(UserType)
@@ -233,6 +266,8 @@ class ObtainJSONWebToken(graphql_jwt.JSONWebTokenMutation):
 
 
 class Mutation(graphene.ObjectType):
+    rating = Rating.Field()
+    bookmark = Bookmark.Field()
     create_user = CreateUser.Field()
     token_auth = ObtainJSONWebToken.Field()
     verify_token = graphql_jwt.Verify.Field()
