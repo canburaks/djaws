@@ -132,9 +132,8 @@ else:
             'PORT': '3306',
         }
     }
-
-
-CACHES = {
+CACHE_OPTIONS=[
+    {
     'default': {
         'BACKEND': 'django_redis.cache.RedisCache',
         'LOCATION': [
@@ -145,7 +144,21 @@ CACHES = {
             "CLIENT_CLASS": "django_redis.client.DefaultClient",
         },
     }
-}
+},{
+    "default": {
+        "BACKEND": "django_redis.cache.RedisCache",
+        ################################################
+        #choose your local redis port
+        #"LOCATION": "redis://127.0.0.1:6379/1",
+        "LOCATION": "127.0.0.1:6379",
+        ################################################
+        "OPTIONS": {
+            "CLIENT_CLASS": "django_redis.client.DefaultClient",
+        }
+    }
+}]
+
+CACHES = CACHE_OPTIONS[1] # 0=>Elasticache 1=>Local Redis
 
 # Password validation
 # https://docs.djangoproject.com/en/2.0/ref/settings/#auth-password-validators

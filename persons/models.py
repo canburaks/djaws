@@ -21,12 +21,18 @@ class Profile(models.Model):
     is_premium = models.BooleanField(default=False)
     ratings = JSONField(default=dict)
     bookmarks = models.ManyToManyField("items.Movie", related_name="bookmarked")
-    follow_director = models.ManyToManyField("persons.Person", related_name="follower", blank=True)
-    #bookmarks = models.ManyToManyField("items.Movie")
+    follows = models.ManyToManyField("persons.Person", related_name="followers", blank=True)
 
     def __str__(self):
         return self.username
-    
+
+    def follow(self, target_person):
+        if target_person not in self.follows.all():
+            self.follows.add(target_person)
+            self.save()
+        elif target_person in self.follows.all():
+            self.follows.remove(target_person)
+            self.save()
     @property
     def token(self):
         from graphql_jwt import shortcuts

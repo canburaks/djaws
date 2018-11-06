@@ -1,6 +1,6 @@
 branch-defaults:
   default:
-    environment: dj-rest-03
+    environment: dj-rest-04
 environment-defaults:
   dj-rest-03:
     branch: null

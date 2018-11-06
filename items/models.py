@@ -1,7 +1,7 @@
 from django.db import models
 from persons.models import Person, Profile
 from django.urls import reverse
-from django_mysql.models import JSONField, SetTextField, ListCharField, SetCharField
+from django_mysql.models import (JSONField, SetTextField, ListTextField, SetCharField)
 
 # Create your models here.
 class List(models.Model):
@@ -36,10 +36,11 @@ class Movie(models.Model):
     director = models.ForeignKey(Person, on_delete=models.CASCADE, null=True,blank=True, related_name="movies")
     actors = models.ForeignKey(Person, on_delete=models.CASCADE, null=True,blank=True, related_name="acted")
     
-    tags = SetTextField(default=set(), base_field=models.CharField(max_length=15), null=True, blank=True)
+    tags = ListTextField(default = list(),base_field=models.CharField(max_length=20),
+                    max_length=20, null=True, blank=True)
     data = JSONField(default=dict)
-    ratings_user = SetCharField(default=set(),max_length=15, base_field=models.IntegerField(),null=True, blank=True)
-    ratings_dummy = SetCharField(default=set(),max_length=15, base_field=models.CharField(max_length=15),null=True, blank=True)
+    ratings_user = SetTextField(default=set(), base_field=models.IntegerField(),null=True, blank=True)
+    ratings_dummy = SetTextField(default=set(), base_field=models.CharField(max_length=15),null=True, blank=True)
     
     @property
     def shortName(self):
@@ -117,6 +118,34 @@ class Movie(models.Model):
         except:
             print("could not get:",self.id, self.name, sep=",")
 
+    def setTmdbInfo(self):
+            from .outerApi import getPosterUrlAndSummary
+
+            from django.core import files
+            from io import BytesIO
+            import requests
+            if self.tmdb_id:
+                try:
+                    tmdb = self.tmdb_id
+                    pUrl, overview, year = getPosterUrlAndSummary(tmdb)
+                    if self.poster=="" or self.poster==None:
+                        try:
+                            resp = requests.get(pUrl)
+                            fp = BytesIO()
+                            fp.write(resp.content)
+                            file_name = "{0}/{0}-tmdb.jpg".format(str(self.id))
+
+                            self.poster.save(file_name, files.File(fp))
+                            print("Movie Poster:{} saved.".format(self.id))
+                        except:
+                            print("request error")
+                    if self.summary==None or self.summary=="":
+                        self.summary = overview
+                        self.save()
+                        print("Movie:{} saved.".format(self.id))
+                except:
+                    print("error Id:{}".format(self.id))
+
 
 class MovieImage(models.Model):
     movie = models.ForeignKey(Movie, related_name='images', on_delete=models.CASCADE)
@@ -133,8 +162,9 @@ class Video(models.Model):
     id = models.IntegerField(primary_key=True)
     title = models.CharField(max_length=150)
     summary = models.CharField(max_length=2000, null=True, blank=True)
-
     link = models.URLField()
+    tags = ListTextField(default = list(),base_field=models.CharField(max_length=20),
+                    max_length=20, null=True, help_text="Enter the type of video category.\n E.g:'video-essay or interview or conversations'")
     duration = models.IntegerField(null=True,blank=True, help_text="seconds")
 
     related_persons = models.ManyToManyField(Person, blank=True, related_name="videos")

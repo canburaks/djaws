@@ -7,7 +7,7 @@ import numpy as np
 from collections import defaultdict
 from django.db import IntegrityError
 
-folder = "/home/cbs/Documents/MovieLens/ml-latest/"
+folder = "/home/jb/Documents/MovieLens/ml-latest/"
 movie = folder + "fullMovieInfo.csv"
 rating = folder + "ratinginfo.csv"
 database = folder + "links.csv"

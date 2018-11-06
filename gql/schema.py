@@ -2,7 +2,7 @@ from django.shortcuts import render
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django_mysql.models import JSONField
-from items.models import Movie, List, MovieImage
+from items.models import Movie, List, MovieImage, Video
 from persons.models import Person, Profile, PersonImage
 import graphene
 import graphql_jwt
@@ -14,6 +14,12 @@ from django.db.models import Q
 @convert_django_field.register(JSONField)
 def convert_json_field_to_string(field, registry=None):
     return graphene.String()
+class VideoType(DjangoObjectType):
+    tags = graphene.types.json.JSONString()
+    class Meta:
+        model=Video
+    def resolve_tags(self, info, *_):
+        return self.tags
 
 class MovieImageType(DjangoObjectType):
     info = graphene.types.json.JSONString()
@@ -24,10 +30,15 @@ class MovieImageType(DjangoObjectType):
 
 class PersonImageType(DjangoObjectType):
     info = graphene.types.json.JSONString()
+    videos = graphene.List(VideoType)
     class Meta:
         model= PersonImage
     def resolve_info(self, info, *_):
         return self.image_info
+    def resolve_videos(self, info, *_):
+        return self.videos.all()
+
+
 
 class MovieType(DjangoObjectType):
     poster = graphene.String()
@@ -82,8 +93,15 @@ class ProfileType(DjangoObjectType):
 class PersonType(DjangoObjectType):
     data = graphene.types.json.JSONString()
     images = graphene.List(PersonImageType) #for property types
+    isFollowed = graphene.Boolean()
     class Meta:
         model = Person
+    def resolve_isFollowed(self, info, *_):
+        if info.context.user.is_authenticated:
+            profile = info.context.user.profile
+            if profile in self.followers.all():
+                return True
+        return False
     def resolve_data(self,info,*_):
         return self.data
     def resolve_images(self,info, *_):
@@ -98,8 +116,7 @@ class UserType(DjangoObjectType):
 
 class Query(graphene.ObjectType):
     person = graphene.Field(PersonType,
-        id=graphene.String(default_value=None),
-        name=graphene.String(default_value=None))
+        id=graphene.String(default_value=None))
     viewer = graphene.Field(ProfileType, username=graphene.String())
     all_movies = graphene.List(MovieType)
     lists = graphene.List(MovieType, 
@@ -122,11 +139,7 @@ class Query(graphene.ObjectType):
         name = kwargs.get("name")
         if id is not None:
             return Person.objects.get(id=id)
-        if name is not None:
-            try:
-                Person.objects.get(name=name)
-            except:
-                raise Exception('Person could not find')
+
 
     def resolve_viewer(self, info, **kwargs):
         user = info.context.user
@@ -279,6 +292,19 @@ class Bookmark(graphene.Mutation):
             profile.bookmarking(movie)
             return Bookmark(user=user, movie=movie)
 
+class Follow(graphene.Mutation):
+    user = graphene.Field(UserType)
+    person = graphene.Field(PersonType)
+    class Arguments:
+        id = graphene.String()
+    def mutate(self,info,id):
+        if info.context.user.is_authenticated:
+            user = info.context.user
+            profile = user.profile
+            person = Person.objects.get(id=id)
+            profile.follow(person)
+            return Follow(user=user, person=person)
+
 class Rating(graphene.Mutation):
     user = graphene.Field(UserType)
     movie = graphene.Field(MovieType)
@@ -304,6 +330,7 @@ class ObtainJSONWebToken(graphql_jwt.JSONWebTokenMutation):
 
 
 class Mutation(graphene.ObjectType):
+    follow = Follow.Field()
     rating = Rating.Field()
     bookmark = Bookmark.Field()
     create_user = CreateUser.Field()
