@@ -7,7 +7,6 @@ if cmd_subfolder not in sys.path:
 
 
 import cfunctions as c
-
 average = c.average
 getKeySet = c.getKeySet
 getKeySetS = c.getKeySetS
@@ -18,23 +17,22 @@ predict = c.predict
 voterSet = c.MovieVoters
 
 
+
 # Create your models here.
 
 
 
-class Dummy(models.Model):
+class Dummy():
     Votes = cache
-    KeySet = set()
-    id = models.IntegerField(primary_key=True)
+
+
+
 
     @classmethod
     def mean(cls,id):
         return c.average(cls.Votes.get(str(id)))
 
-    @classmethod
-    def keys(cls, id):
-        "Returns set objects"
-        return c.getKeySet(cls.Votes.get(str(id)))
+
 
 
     @classmethod
@@ -42,7 +40,6 @@ class Dummy(models.Model):
         "Bring users that rated target movie and their all votes"
         from items.models import Movie
         userList = Movie.objects.get(id=movid).ratings_dummy
-        #dic = {key:cls.Votes.get(key) for key in userList if cls.Votes.get(key)}
         dic = {key:cls.Votes.get(key) for key in userList}
         "{'key': {2571:4.0}, ... }"
         return dic
@@ -52,8 +49,8 @@ class Dummy(models.Model):
     def prediction(cls, profile, target):
         movid = target.id
 
-        profileVotes = profile.ratings["movie"]
-        "{ 2571: 4, 1:3.5, ...}"
+        profileVotes = {int(key): value for key,value in profile.ratings.items()}
+        "{ '2571': 4, '1' : 3.5, ...}" # to {2571 : 4, 1:}
         profileMean = c.average(profileVotes)
         greatDict = cls.greatDict(movid)
         "{'157000': {2571:4.0}, ... }"
@@ -63,15 +60,20 @@ class Dummy(models.Model):
         commons = dict()
         for d in greatDict.keys():
             interectionQuantity = len(intersection(profileVotes, greatDict.get(d)))
-            if interectionQuantity > lowerLimit:
+            if interectionQuantity >= lowerLimit:
                 commons.update({d:interectionQuantity})
         #if len(commons)<50:
         #    for d in greatDict.keys():
         #        interectionQuantity = len(intersection(profileVotes, greatDict.get(d)))
         #        if interectionQuantity > middleLimit:
         #            commons.update({d:interectionQuantity})
+        if len(commons.items())<40:
+            for d in greatDict.keys():
+                interectionQuantity = len(intersection(profileVotes, greatDict.get(d)))
+                if interectionQuantity > 10 and interectionQuantity<15:
+                    commons.update({d:interectionQuantity})
 
-        NQ= sorted(commons.items(), key=lambda x:x[1], reverse=True)[:200]
+        NQ= sorted(commons.items(), key=lambda x:x[1], reverse=True)[:100]
         "[ ('157000', 5)....]"
         print("{} number of Neighbours brought".format(len(NQ)))
 
@@ -84,26 +86,35 @@ class Dummy(models.Model):
             rate = dummyVotes.get(target.id)
             if corr>0.2:
                 PQ.append(( vbar, corr, rate ))
-        PQsorted = sorted(PQ, key=lambda x: x[1], reverse=True)[:10]
+        PQsorted = sorted(PQ, key=lambda x: x[1], reverse=True)[:20]
         print("Number of correlated Neigbours:{}".format(len(PQ)))
+        if len(PQ)<4:
+            return 0
 
         pred = predict(PQsorted, profileMean)
-        if pred>5:
-            pred = 4.87
-
         greatDict = {}
-        return pred
+        if pred>5:
+            return 4.87
+        elif pred>4 and pred<5:
+            return pred - 0.1
+        elif pred<0:
+            return 0
+        return pred - 0.1
 
-def opening():
-    import _pickle as pickle
-
-    with open("static/pickles/KeySet.pickle","rb") as f:
-        p = pickle.load(f)
-        Dummy.KeySet = p.copy()
-opening()
 
 
 """
+def opening():
+    import _pickle as pickle
+    import bz2
+    with bz2.BZ2File("static/pickles/newdummies.pbz2","r") as f:
+        p = pickle.load(f)
+    for d in p.keys():
+        cache.set(d,p.get(d),None)
+    print("\n Dummies added\n")
+opening()
+
+
 def opening():
     import _pickle as pickle
 

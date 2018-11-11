@@ -158,7 +158,7 @@ CACHE_OPTIONS=[
     }
 }]
 
-CACHES = CACHE_OPTIONS[1] # 0=>Elasticache 1=>Local Redis
+CACHES = CACHE_OPTIONS[0] # 0=>Elasticache 1=>Local Redis
 
 # Password validation
 # https://docs.djangoproject.com/en/2.0/ref/settings/#auth-password-validators

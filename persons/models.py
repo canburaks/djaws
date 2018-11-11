@@ -23,6 +23,7 @@ class Profile(models.Model):
     bookmarks = models.ManyToManyField("items.Movie", related_name="bookmarked")
     follows = models.ManyToManyField("persons.Person", related_name="followers", blank=True)
 
+
     def __str__(self):
         return self.username
 
@@ -44,8 +45,8 @@ class Profile(models.Model):
 
     def rate(self,target, rate, item="Movie"):
             movid = target.id
-            self.ratings.update({str(movid):float(rate)})
-            target.ratings_user.add(self.id)
+            self.ratings.update({movid:float(rate)})
+            target.ratings_user.add(str(self.id))
             self.save()
             target.save()
             print("Rate Added")
@@ -69,6 +70,7 @@ class Profile(models.Model):
         try:
             result = Dummy.prediction(self, target,**kwargs)
         except:
+            print("exception in profile")
             result = 0
         return result
 

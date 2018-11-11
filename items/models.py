@@ -2,6 +2,7 @@ from django.db import models
 from persons.models import Person, Profile
 from django.urls import reverse
 from django_mysql.models import (JSONField, SetTextField, ListTextField, SetCharField)
+from django.utils.functional import cached_property
 
 # Create your models here.
 class List(models.Model):
@@ -11,12 +12,10 @@ class List(models.Model):
     #tags = JSONField(default=dict,blank=True, null=True)
     movies = models.ManyToManyField("Movie")
 
-    def __str__(self):
-        return self.name
-
-    class Meta:
-        ordering = ["-id"]
-
+    @cached_property
+    def get_movies(self):
+        return self.movies.all().order_by("-imdb_rating")
+    
 
 def item_image_upload_path(instance, filename):
     return "posters/{0}/{1}".format(instance.movie.id,filename)
@@ -38,8 +37,9 @@ class Movie(models.Model):
     
     tags = ListTextField(default = list(),base_field=models.CharField(max_length=20),
                     max_length=20, null=True, blank=True)
+    
     data = JSONField(default=dict)
-    ratings_user = SetTextField(default=set(), base_field=models.IntegerField(),null=True, blank=True)
+    ratings_user = SetTextField(default=set(), base_field=models.CharField(max_length=15),null=True, blank=True)
     ratings_dummy = SetTextField(default=set(), base_field=models.CharField(max_length=15),null=True, blank=True)
     
     @property
@@ -163,10 +163,12 @@ class Video(models.Model):
     title = models.CharField(max_length=150)
     summary = models.CharField(max_length=2000, null=True, blank=True)
     link = models.URLField()
-    tags = ListTextField(default = list(),base_field=models.CharField(max_length=20),
-                    max_length=20, null=True, help_text="Enter the type of video category.\n E.g:'video-essay or interview or conversations'")
+    tags = ListTextField(default = list(),base_field=models.CharField(max_length=40),
+                    null=True, help_text="Enter the type of video category.\n E.g:'video-essay or interview or conversations'")
     duration = models.IntegerField(null=True,blank=True, help_text="seconds")
 
+    channel_url = models.URLField(null=True, blank=True, help_text="Youtube channel's main page link")
+    channel_name = models.CharField(max_length=150, null=True, blank=True, help_text="Name of the Youtube channel")
     related_persons = models.ManyToManyField(Person, blank=True, related_name="videos")
     related_movies = models.ManyToManyField(Movie, blank=True, related_name="videos")
 
