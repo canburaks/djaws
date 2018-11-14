@@ -18,7 +18,7 @@ class ListAdmin(admin.ModelAdmin):
 
 @admin.register(Video)
 class VideoAdmin(admin.ModelAdmin):
-    list_display = ("id",'title',"link", "duration")
+    list_display = ("id",'title',"link")
     search_fields = ('id',"related_persons", 'title',"summary","videos__id" )
 
 

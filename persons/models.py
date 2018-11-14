@@ -45,7 +45,7 @@ class Profile(models.Model):
 
     def rate(self,target, rate, item="Movie"):
             movid = target.id
-            self.ratings.update({movid:float(rate)})
+            self.ratings.update({str(movid):float(rate)})
             target.ratings_user.add(str(self.id))
             self.save()
             target.save()
@@ -67,12 +67,7 @@ class Profile(models.Model):
 
     def predict(self, target, **kwargs):
         from algorithm.models import  Dummy
-        try:
-            result = Dummy.prediction(self, target,**kwargs)
-        except:
-            print("exception in profile")
-            result = 0
-        return result
+        return Dummy.prediction(self, target)
 
     def convInt(self):
         oldrates = self.ratings["movie"]

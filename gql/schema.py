@@ -3,7 +3,7 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django_mysql.models import JSONField
 from items.models import Movie, List, MovieImage, Video
-from persons.models import Person, Profile, PersonImage
+from persons.models import Person, Profile, PersonImage, Director
 from algorithm.models import Dummy
 import graphene
 import graphql_jwt
@@ -60,7 +60,6 @@ class ProfileType(DjangoObjectType):
     def resolve_len_ratings(self, info):
         return len(self.ratings)
 
-
 class MovieType(DjangoObjectType):
     poster = graphene.String()
     images = graphene.List(MovieImageType) #for property types
@@ -104,8 +103,6 @@ class MovieType(DjangoObjectType):
     def resolve_tags(self, info, *_):
         return self.tags
 
-
-
 class DummyType():
     ratings = graphene.types.json.JSONString()
     class Meta:
@@ -131,6 +128,23 @@ class PersonType(DjangoObjectType):
     def resolve_images(self,info, *_):
         return self.images.all()
 
+class DirectorType(DjangoObjectType):
+    data = graphene.types.json.JSONString()
+    images = graphene.List(PersonImageType) #for property types
+    isFollowed = graphene.Boolean()
+    class Meta:
+        model = Person
+    def resolve_isFollowed(self, info, *_):
+        if info.context.user.is_authenticated:
+            profile = info.context.user.profile
+            if profile in self.followers.all():
+                return True
+        return False
+    def resolve_data(self,info,*_):
+        return self.data
+    def resolve_images(self,info, *_):
+        return self.images.all()
+
 class UserType(DjangoObjectType):
     class Meta:
         model = get_user_model()
@@ -139,6 +153,7 @@ class UserType(DjangoObjectType):
 
 
 class Query(graphene.ObjectType):
+    directors = graphene.List(DirectorType)
     prediction = graphene.Float(movieId=graphene.Int())
     dummy = graphene.types.json.JSONString(dummyId=graphene.String())
     person = graphene.Field(PersonType,
@@ -159,7 +174,11 @@ class Query(graphene.ObjectType):
     )
     movie = graphene.Field(MovieType,id=graphene.Int(),name=graphene.String())
     all_profiles = graphene.List(ProfileType)
+    
+    def resolve_directors(self, info, **kwargs):
 
+        return Director.objects.all()
+    
     def resolve_dummy(self, info, **kwargs):
         dummyId = kwargs.get("dummyId")
         return Dummy.Votes.get(dummyId)

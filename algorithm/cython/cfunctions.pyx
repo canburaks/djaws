@@ -1,10 +1,6 @@
 from collections import Counter, defaultdict
-cimport cython
 from libc.math cimport pow, sqrt, fabs, floor
-from numpy cimport ndarray
-cimport numpy as np
-cimport cython
-from libc.stdlib cimport malloc, free
+
 
 
 def average(dict votes):
@@ -118,6 +114,8 @@ def predict(list PQList, double ubar):
         rate = element[2]
         top += corr*(rate - vbar)
         sigmaCorr += fabs(corr)
+        dbg += 1
+        print(dbg)
     if sigmaCorr == 0.0:
         print("Correlation sum is zero")
         return 0

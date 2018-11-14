@@ -1,12 +1,14 @@
 from django.db import models
-from django.core.cache import cache
 import os, sys, inspect
 cmd_subfolder = os.path.realpath(os.path.abspath(os.path.join(os.path.split(inspect.getfile( inspect.currentframe() ))[0],"cython")))
 if cmd_subfolder not in sys.path:
     sys.path.insert(0, cmd_subfolder)
 
-
 import cfunctions as c
+
+
+from django.core.cache import cache
+
 average = c.average
 getKeySet = c.getKeySet
 getKeySetS = c.getKeySetS
@@ -38,8 +40,19 @@ class Dummy():
     @classmethod
     def greatDict(cls, movid):
         "Bring users that rated target movie and their all votes"
+        import random
         from items.models import Movie
         userList = Movie.objects.get(id=movid).ratings_dummy
+        num_of_user_list = len(userList)
+        if (num_of_user_list>10000) and (num_of_user_list<20000):
+            userList = random.sample(userList, num_of_user_list//2)
+
+        elif (num_of_user_list>20000) and (num_of_user_list<40000):
+            userList = random.sample(userList, num_of_user_list//4)
+
+        elif (num_of_user_list>40000):
+            userList = random.sample(userList,num_of_user_list//8)
+
         dic = {key:cls.Votes.get(key) for key in userList}
         "{'key': {2571:4.0}, ... }"
         return dic
@@ -67,11 +80,6 @@ class Dummy():
         #        interectionQuantity = len(intersection(profileVotes, greatDict.get(d)))
         #        if interectionQuantity > middleLimit:
         #            commons.update({d:interectionQuantity})
-        if len(commons.items())<40:
-            for d in greatDict.keys():
-                interectionQuantity = len(intersection(profileVotes, greatDict.get(d)))
-                if interectionQuantity > 10 and interectionQuantity<15:
-                    commons.update({d:interectionQuantity})
 
         NQ= sorted(commons.items(), key=lambda x:x[1], reverse=True)[:100]
         "[ ('157000', 5)....]"
@@ -84,7 +92,7 @@ class Dummy():
             vbar = cls.mean(dummyId)
             corr = c.pearson(profileVotes, dummyVotes)
             rate = dummyVotes.get(target.id)
-            if corr>0.2:
+            if corr>0.2 and rate:
                 PQ.append(( vbar, corr, rate ))
         PQsorted = sorted(PQ, key=lambda x: x[1], reverse=True)[:20]
         print("Number of correlated Neigbours:{}".format(len(PQ)))
@@ -93,13 +101,11 @@ class Dummy():
 
         pred = predict(PQsorted, profileMean)
         greatDict = {}
-        if pred>5:
-            return 4.87
-        elif pred>4 and pred<5:
-            return pred - 0.1
-        elif pred<0:
+        if pred>5 or pred<=0:
             return 0
-        return pred - 0.1
+        elif (pred>4.4) and (pred<4.8):
+            return pred -0.4
+        return pred - 0.2
 
 
 
