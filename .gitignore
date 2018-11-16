@@ -118,3 +118,6 @@ venv.bak/
 dmypy.json
 
 # Pyre type checker
+*.pyc
+*.pyc
+*.pyc

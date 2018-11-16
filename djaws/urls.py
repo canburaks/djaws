@@ -24,16 +24,11 @@ from django.contrib.auth import views as auth_views
 from django.views.decorators.csrf import csrf_exempt
 from graphene_django.views import GraphQLView
 from persons.views import HomeList
-from django.views.generic import TemplateView
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-
-    path(r'', TemplateView.as_view(template_name="index.html")),
-    #path("",HomeList.as_view(), name="home"),
-
+    path("",HomeList.as_view(), name="home"),
     re_path(r'^graphql', csrf_exempt(GraphQLView.as_view(graphiql=True))),
-    re_path(r'^(?:.*)/?$', TemplateView.as_view(template_name="index.html")),
 ]
 
 

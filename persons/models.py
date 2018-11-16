@@ -45,7 +45,7 @@ class Profile(models.Model):
 
     def rate(self,target, rate, item="Movie"):
             movid = target.id
-            self.ratings.update({str(movid):float(rate)})
+            self.ratings.update({movid:float(rate)})
             target.ratings_user.add(str(self.id))
             self.save()
             target.save()

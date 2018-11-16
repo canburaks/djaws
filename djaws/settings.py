@@ -87,7 +87,9 @@ GRAPHENE = {
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': (os.path.join(BASE_DIR, 'templates'),),
+        'DIRS': (
+            os.path.join(BASE_DIR, 'templates'),
+        ),
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -190,14 +192,6 @@ USE_L10N = True
 
 USE_TZ = True
 
-
-
-WEBPACK_LOADER = {
-    'DEFAULT': {
-            'BUNDLE_DIR_NAME': '',
-            'STATS_FILE': os.path.join(BASE_DIR, 'webpack-stats.json'),
-        }
-}
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/2.0/howto/static-files/
