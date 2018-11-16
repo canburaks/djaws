@@ -122,3 +122,12 @@ dmypy.json
 *.pyc
 *.pyc
 *.pyc
+algorithm/__pycache__/models.cpython-37.pyc
+djaws/__pycache__/settings.cpython-37.pyc
+djaws/__pycache__/settings.cpython-37.pyc
+djaws/__pycache__/urls.cpython-37.pyc
+gql/__pycache__/schema.cpython-37.pyc
+items/__pycache__/admin.cpython-37.pyc
+items/__pycache__/models.cpython-37.pyc
+persons/__pycache__/admin.cpython-37.pyc
+persons/__pycache__/models.cpython-37.pyc
