@@ -3,8 +3,31 @@ from persons.models import Person, Profile
 from django.urls import reverse
 from django_mysql.models import (JSONField, SetTextField, ListTextField, SetCharField)
 from django.utils.functional import cached_property
+from django.conf import settings
 
-# Create your models here.
+def item_image_upload_path(instance, filename):
+    return "posters/{0}/{1}".format(instance.movie.id,filename)
+
+
+class Topic(models.Model):
+    id = models.IntegerField(primary_key=True)
+    name = models.CharField(max_length=400)
+    summary = models.TextField(max_length=1000,null=True, blank=True)
+    content = models.TextField(max_length=5000,null=True, blank=True)
+    #tags = JSONField(default=dict,blank=True, null=True)
+    movies = models.ManyToManyField("Movie")
+    lists = models.ManyToManyField("List")
+
+    @property
+    def image(self):
+        aws = settings.MEDIA_URL
+        posters = self.movies.order_by("?").values("poster")[:5]
+        poster_urls = ["{}{}".format(aws,i["poster"]) for i in posters]
+        dictionary = {"thumbs":poster_urls[:5]}
+        return dictionary
+
+
+
 class List(models.Model):
     id = models.IntegerField(primary_key=True)
     name = models.CharField(max_length=400)
@@ -12,13 +35,25 @@ class List(models.Model):
     #tags = JSONField(default=dict,blank=True, null=True)
     movies = models.ManyToManyField("Movie")
 
+
     @cached_property
     def get_movies(self):
         return self.movies.all().order_by("-imdb_rating")
     
-
-def item_image_upload_path(instance, filename):
-    return "posters/{0}/{1}".format(instance.movie.id,filename)
+    @property
+    def image(self):
+        aws = settings.MEDIA_URL
+        posters = self.movies.order_by("?").values("poster")
+        poster_urls = ["{}{}".format(aws,i["poster"]) for i in posters][:10]
+        dictionary = {"id":self.id, "name":self.name, "summary":self.summary, "thumbs":poster_urls}
+        return dictionary
+    @property
+    def items(self):
+        aws = settings.MEDIA_URL
+        movies = self.movies.order_by("-imdb_id").defer("imdb_id",
+                "tmdb_id","actors","data","ratings_dummy","director","summary","tags","ratings_user")
+        movie_dictionary = [{"name":i["name"], "id":i["id"], "poster":"{}{}".format(aws,i["poster"])} for i in movies]
+        return movies
 
 
 class Movie(models.Model):
@@ -174,3 +209,16 @@ class Video(models.Model):
 
     def __str__(self):
         return self.title
+
+class Rating(models.Model):
+    profile = models.ForeignKey(Profile, related_name='rates', on_delete=models.CASCADE)
+    movie = models.ForeignKey(Movie, related_name='rates', on_delete=models.CASCADE)
+    rating = models.DecimalField(max_digits=2, decimal_places=1, null=True, blank=True)
+
+    notes = models.CharField(max_length=2500, blank=True, null=True)
+    date = models.DateField(null=True, blank=True)
+
+    class Meta:
+        unique_together = ("profile","movie",)
+    def __str__(self):
+        return "Profile: {}, Movie: {}, Ratings:{}".format(self.profile, self.movie,self.rating)

@@ -18,11 +18,13 @@ class PersonAdmin(admin.ModelAdmin):
     list_display = ("id",'name',)
     inlines = [VideoPersonInline,ImagePersonInline,]
     search_fields = ('name', 'id', )
+
 @admin.register(Director)
 class DirectorAdmin(admin.ModelAdmin):
     list_display = ("id",'name',)
     inlines = [VideoPersonInline,ImagePersonInline,]
     search_fields = ('name', 'id', )
+    
 @admin.register(PersonImage)
 class PersonImageAdmin(admin.ModelAdmin):
     list_display = ("id","person","info","image" )

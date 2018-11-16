@@ -2,7 +2,7 @@ from django.shortcuts import render
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django_mysql.models import JSONField
-from items.models import Movie, List, MovieImage, Video
+from items.models import Movie, List, MovieImage, Video, Rating
 from persons.models import Person, Profile, PersonImage, Director
 from algorithm.models import Dummy
 import graphene
@@ -12,9 +12,12 @@ from graphene_django.types import DjangoObjectType
 from graphene_django.converter import convert_django_field
 from graphene_django.filter import DjangoFilterConnectionField
 from django.db.models import Q
+from django.conf import settings
+
 @convert_django_field.register(JSONField)
 def convert_json_field_to_string(field, registry=None):
     return graphene.String()
+    
 class VideoType(DjangoObjectType):
     tags = graphene.types.json.JSONString()
     class Meta:
@@ -151,13 +154,36 @@ class UserType(DjangoObjectType):
     def resolve_token(self, info, **kwargs):
         return graphql_jwt.shortcuts.get_token(self)
 
+class ListType(DjangoObjectType):
+    image = graphene.types.json.JSONString()
+    isFollowed = graphene.Boolean()
+    class Meta:
+        model=List
+
+    def resolve_image(self, info, *_):
+        return self.image
+
+    def resolve_isFollowed(self, info, *_):
+        if info.context.user.is_authenticated:
+            profile = info.context.user.profile
+            if profile in self.followers.all():
+                return True
+        return False
 
 class Query(graphene.ObjectType):
+    list_of_lists = graphene.List(ListType)
+    new_lists = graphene.List(graphene.types.json.JSONString,
+            id=graphene.Int(default_value=None), 
+        name=graphene.String(default_value=None)
+    )
+
     directors = graphene.List(DirectorType)
     prediction = graphene.Float(movieId=graphene.Int())
     dummy = graphene.types.json.JSONString(dummyId=graphene.String())
+
     person = graphene.Field(PersonType,
         id=graphene.String(default_value=None))
+
     viewer = graphene.Field(ProfileType, username=graphene.String())
     all_movies = graphene.List(MovieType)
     lists = graphene.List(MovieType, 
@@ -167,6 +193,7 @@ class Query(graphene.ObjectType):
         first=graphene.Int(default_value=None),
         skip=graphene.Int(default_value=None)
         )
+
     length = graphene.Int(
         id=graphene.Int(default_value=None), 
         name=graphene.String(default_value=None),
@@ -175,8 +202,12 @@ class Query(graphene.ObjectType):
     movie = graphene.Field(MovieType,id=graphene.Int(),name=graphene.String())
     all_profiles = graphene.List(ProfileType)
     
-    def resolve_directors(self, info, **kwargs):
 
+
+    def resolve_list_of_lists(self, info, **kwargs):
+        return List.objects.all()
+
+    def resolve_directors(self, info, **kwargs):
         return Director.objects.all()
     
     def resolve_dummy(self, info, **kwargs):
@@ -283,6 +314,11 @@ class Query(graphene.ObjectType):
                     if first:
                         result = result[:first]
                     return result
+                
+                if name=="ratings2":
+
+                    return Movie.objects.filter(id__in=user.profile.rates.all())
+
                 if name=="bookmarks":
                     result = user.profile.bookmarks.all().defer("imdb_id",
                 "tmdb_id","actors","data","ratings_dummy","director","summary","tags","ratings_user")
@@ -359,15 +395,22 @@ class Bookmark(graphene.Mutation):
 class Follow(graphene.Mutation):
     user = graphene.Field(UserType)
     person = graphene.Field(PersonType)
+    liste = graphene.Field(ListType)
     class Arguments:
         id = graphene.String()
-    def mutate(self,info,id):
+        obj = graphene.String()
+    def mutate(self,info,id, obj):
         if info.context.user.is_authenticated:
             user = info.context.user
             profile = user.profile
-            person = Person.objects.get(id=id)
-            profile.follow(person)
-            return Follow(user=user, person=person)
+            if obj=="p" or obj=="person":
+                person = Person.objects.get(id=id)
+                profile.follow_person(person)
+                return Follow(user=user, person=person)
+            elif obj.startswith("l"):
+                liste = List.objects.get(id=int(id))
+                profile.follow_list(liste)
+                return Follow(user=user, liste=liste)
 
 class Rating(graphene.Mutation):
     user = graphene.Field(UserType)
@@ -375,13 +418,15 @@ class Rating(graphene.Mutation):
     class Arguments:
         id = graphene.Int()
         rate = graphene.Float()
+        date = graphene.types.datetime.Date(required=False)
+        notes = graphene.String(required=False)
 
-    def mutate(self,info,id, rate):
+    def mutate(self,info,id, rate, date=None, notes=None):
         if info.context.user.is_authenticated:
             user = info.context.user
             profile = user.profile
             movie = Movie.objects.get(id=id)
-            profile.rate(movie, rate)
+            profile.rate(movie, rate, notes=notes, date=date )
             return Rating(user=user, movie=movie)
 
 
@@ -396,7 +441,7 @@ class ObtainJSONWebToken(graphql_jwt.JSONWebTokenMutation):
 
 
 class Mutation(graphene.ObjectType):
-    follow = Follow.Field()
+    follow= Follow.Field()
     rating = Rating.Field()
     bookmark = Bookmark.Field()
     create_user = CreateUser.Field()

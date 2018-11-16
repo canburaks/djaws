@@ -40,8 +40,19 @@ class Dummy():
     @classmethod
     def greatDict(cls, movid):
         "Bring users that rated target movie and their all votes"
+        import random
         from items.models import Movie
         userList = Movie.objects.get(id=movid).ratings_dummy
+        num_of_user_list = len(userList)
+        if (num_of_user_list>10000) and (num_of_user_list<20000):
+            userList = random.sample(userList, num_of_user_list//2)
+
+        elif (num_of_user_list>20000) and (num_of_user_list<40000):
+            userList = random.sample(userList, num_of_user_list//4)
+
+        elif (num_of_user_list>40000):
+            userList = random.sample(userList,num_of_user_list//8)
+
         dic = {key:cls.Votes.get(key) for key in userList}
         "{'key': {2571:4.0}, ... }"
         return dic
@@ -90,10 +101,16 @@ class Dummy():
 
         pred = predict(PQsorted, profileMean)
         greatDict = {}
-        if pred>5:
-            return 4.87
-        elif pred<=0:
+        if pred>5 or pred<=0:
             return 0
+        elif (pred>=4.4) and (pred<4.6):
+            return 4.2
+        elif (pred>=4.6) and (pred<4.8):
+            return 4.3
+        elif (pred>=4.8) and (pred<5):
+            return 4.4
+        elif pred==5:
+            return 4.5
         return pred - 0.2
 
 

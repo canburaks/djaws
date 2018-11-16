@@ -26,6 +26,7 @@ django-mysql==2.4.1
 django-redis==4.9.0
 django-rest-knox==3.1.5
 django-warrant==0.1.0
+django-webpack-loader==0.6.0
 djangorestframework-jwt==1.11.0
 docker==3.5.0
 docker-compose==1.21.2

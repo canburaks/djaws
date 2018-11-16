@@ -21,19 +21,29 @@ class Profile(models.Model):
     is_premium = models.BooleanField(default=False)
     ratings = JSONField(default=dict)
     bookmarks = models.ManyToManyField("items.Movie", related_name="bookmarked")
-    follows = models.ManyToManyField("persons.Person", related_name="followers", blank=True)
+    follow_persons = models.ManyToManyField("persons.Person", related_name="followers", blank=True)
+    follow_lists = models.ManyToManyField("items.List", related_name="followers", blank=True)
 
 
     def __str__(self):
         return self.username
 
-    def follow(self, target_person):
-        if target_person not in self.follows.all():
-            self.follows.add(target_person)
+    def follow_person(self, target_person):
+        if target_person not in self.follow_persons.all():
+            self.follow_persons.add(target_person)
             self.save()
-        elif target_person in self.follows.all():
-            self.follows.remove(target_person)
+        elif target_person in self.follow_persons.all():
+            self.follow_persons.remove(target_person)
             self.save()
+
+    def follow_list(self, target_list):
+        if target_list not in self.follow_lists.all():
+            self.follow_lists.add(target_list)
+            self.save()
+        elif target_list in self.follow_lists.all():
+            self.follow_lists.remove(target_list)
+            self.save()
+
     @property
     def token(self):
         from graphql_jwt import shortcuts
@@ -43,10 +53,20 @@ class Profile(models.Model):
         did = 1000000 +self.id
         return did
 
-    def rate(self,target, rate, item="Movie"):
+    def rate(self,target, rate,**kwargs):
+            from items.models import Rating
+            notes = kwargs.get("notes")
+            date = kwargs.get("date")
             movid = target.id
-            self.ratings.update({movid:float(rate)})
+            self.ratings.update({str(movid):float(rate)})
             target.ratings_user.add(str(self.id))
+
+            r , created = Rating.objects.update_or_create(profile=self, movie=target)
+            r.rating = rate
+            r.notes = notes
+            r.date = date
+            r.save()
+
             self.save()
             target.save()
             print("Rate Added")
@@ -68,12 +88,6 @@ class Profile(models.Model):
     def predict(self, target, **kwargs):
         from algorithm.models import  Dummy
         return Dummy.prediction(self, target)
-
-    def convInt(self):
-        oldrates = self.ratings["movie"]
-        newrates = {int(key):val for key,val in oldrates.items()}
-        self.ratings["movie"] = newrates
-        self.save()
 
 
     @property

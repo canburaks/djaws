@@ -10,7 +10,8 @@ class ImageMovieInline(admin.TabularInline):
 class MovieAdmin(admin.ModelAdmin):
     list_display = ("id",'name',"year","imdb_id","tmdb_id", "imdb_rating","poster" )
     inlines = [VideoMovieInline,ImageMovieInline,]
-    search_fields = ('name', 'imdb_id',"tmdb_id", 'id',"videos__id" )
+    search_fields = ('name', 'imdb_id',"tmdb_id", 'id' )
+
 # Register your models here.
 @admin.register(List)
 class ListAdmin(admin.ModelAdmin):
@@ -19,7 +20,10 @@ class ListAdmin(admin.ModelAdmin):
 @admin.register(Video)
 class VideoAdmin(admin.ModelAdmin):
     list_display = ("id",'title',"link")
-    search_fields = ('id',"related_persons", 'title',"summary","videos__id" )
+    search_fields = ('id',"related_persons", 'title',"summary","related_movies__name" )
+    exclude = ("related_movies",)
+
+
 
 
 @admin.register(MovieImage)
