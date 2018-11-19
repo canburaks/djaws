@@ -23,7 +23,7 @@ class Profile(models.Model):
     bookmarks = models.ManyToManyField("items.Movie", related_name="bookmarked")
     follow_persons = models.ManyToManyField("persons.Person", related_name="followers", blank=True)
     follow_lists = models.ManyToManyField("items.List", related_name="followers", blank=True)
-
+    follow_topics = models.ManyToManyField("items.Topic", related_name="followers", blank=True)
 
     def __str__(self):
         return self.username
@@ -34,6 +34,14 @@ class Profile(models.Model):
             self.save()
         elif target_person in self.follow_persons.all():
             self.follow_persons.remove(target_person)
+            self.save()
+
+    def follow_topic(self, target_topic):
+        if target_topic not in self.follow_topics.all():
+            self.follow_topics.add(target_topic)
+            self.save()
+        elif target_topic in self.follow_topics.all():
+            self.follow_topics.remove(target_topic)
             self.save()
 
     def follow_list(self, target_list):

@@ -131,3 +131,6 @@ items/__pycache__/admin.cpython-37.pyc
 items/__pycache__/models.cpython-37.pyc
 persons/__pycache__/admin.cpython-37.pyc
 persons/__pycache__/models.cpython-37.pyc
+*.pyc
+algorithm/__pycache__/models.cpython-36.pyc
+*.pyc

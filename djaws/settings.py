@@ -49,6 +49,7 @@ INSTALLED_APPS = [
     "gql",
 
     'corsheaders',
+    "storages",
 ]
 
 CORS_ORIGIN_ALLOW_ALL = True
@@ -189,15 +190,19 @@ USE_I18N = True
 USE_L10N = True
 
 USE_TZ = True
+#########################################################################
+#       S3
 
 
+AWS_ACCESS_KEY_ID = "AKIAJLH2SIQQYCL4TUPA"
+AWS_SECRET_ACCESS_KEY = "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"
+AWS_STORAGE_BUCKET_NAME = "cbs-static"
 
-WEBPACK_LOADER = {
-    'DEFAULT': {
-            'BUNDLE_DIR_NAME': '',
-            'STATS_FILE': os.path.join(BASE_DIR, 'webpack-stats.json'),
-        }
-}
+
+DEFAULT_FILE_STORAGE = 'djaws.storage_backends.MediaStorage'
+
+
+##########################################################################
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/2.0/howto/static-files/
