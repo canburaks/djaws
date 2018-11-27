@@ -12,7 +12,7 @@ import graphql_jwt
 from graphql_jwt.decorators import login_required
 
 from .types import (VideoType, MovieType, ProfileType, PersonType,
-        DirectorType, TopicType, ListType, UserType)
+        DirectorType, TopicType, ListType, UserType, RatingType)
 
 @convert_django_field.register(JSONField)
 def convert_json_field_to_string(field, registry=None):
@@ -84,6 +84,7 @@ class Follow(graphene.Mutation):
 class Rating(graphene.Mutation):
     user = graphene.Field(UserType)
     movie = graphene.Field(MovieType)
+    rating = graphene.Field(RatingType)
     class Arguments:
         id = graphene.Int()
         rate = graphene.Float()
@@ -96,7 +97,18 @@ class Rating(graphene.Mutation):
             profile = user.profile
             movie = Movie.objects.get(id=id)
             profile.rate(movie, rate, notes=notes, date=date )
-            return Rating(user=user, movie=movie)
+            rating = profile.rates.get(movie=movie)
+            return Rating(user=user, movie=movie, rating=rating)
+
+class Logout(graphene.Mutation):
+    user = graphene.Field(UserType)
+
+    def mutate(self, info):
+        if info.context.user.is_authenticated:
+            user = info.context.user
+            from django.contrib.auth import logout
+            logout()
+        return Logout(user=user)
 
 
 

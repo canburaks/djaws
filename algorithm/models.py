@@ -27,13 +27,9 @@ voterSet = c.MovieVoters
 class Dummy():
     Votes = cache
 
-
-
-
     @classmethod
     def mean(cls,id):
         return c.average(cls.Votes.get(str(id)))
-
 
 
 

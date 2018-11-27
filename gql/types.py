@@ -1,7 +1,6 @@
-from items.models import Movie, List, MovieImage, Video, Topic
+from items.models import Rating,Movie, List, MovieImage, Video, Topic
 from persons.models import Person, Profile, PersonImage, Director
 from algorithm.models import Dummy
-from items.models import Rating
         
 from django.contrib.auth import get_user_model
 
@@ -15,11 +14,12 @@ def convert_json_field_to_string(field, registry=None):
     return graphene.String()
 
 class VideoType(DjangoObjectType):
-    tags = graphene.types.json.JSONString()
+    tags = graphene.List(graphene.String)
+    #tags = graphene.types.json.JSONString()
     class Meta:
         model=Video
     def resolve_tags(self, info, *_):
-        return self.tags
+        return [x for x in self.tags]
 
 class MovieImageType(DjangoObjectType):
     info = graphene.types.json.JSONString()
@@ -29,12 +29,15 @@ class MovieImageType(DjangoObjectType):
         return self.image_info
 
 class PersonImageType(DjangoObjectType):
-    info = graphene.types.json.JSONString()
+    info =  graphene.String()
+    url = graphene.String()
     videos = graphene.List(VideoType)
     class Meta:
         model= PersonImage
+    def resolve_url(self, info, *_):
+        return self.image.url
     def resolve_info(self, info, *_):
-        return self.image_info
+        return self.info
     def resolve_videos(self, info, *_):
         return self.videos.all()
 
@@ -48,16 +51,35 @@ class MovieType(DjangoObjectType):
     data = graphene.types.json.JSONString()
     tags = graphene.types.json.JSONString()
     viewer_points = graphene.Int()
+    viewer_notes = graphene.String()
+    viewer_rating_date = graphene.types.datetime.Date()
 
 
     class Meta:
         model = Movie
+    def resolve_viewer_rating_date(self, info, *_):
+        if info.context.user.is_authenticated:
+            profile= info.context.user.profile
+            try:
+                return profile.rates.get(movie=self).date
+            except:
+                return ""
 
+    def resolve_viewer_notes(self, info, *_):
+        if info.context.user.is_authenticated:
+            profile= info.context.user.profile
+            try:
+                return profile.rates.get(movie=self).notes
+            except:
+                return ""
+
+            
     def resolve_viewer_points(self, info, *_):
         if info.context.user.is_authenticated:
             profile= info.context.user.profile
             return len(profile.ratings.items())
         return 0
+    
 
     def resolve_poster(self, info, *_):
         if self.poster:
@@ -91,12 +113,9 @@ class DummyType():
         return Dummy.Votes.get(1)
 
 class RatingType(DjangoObjectType):
-    
-    movie = graphene.Field(MovieType)
     class Meta:
         model= Rating
-    def resolve_movie(self, info, *_):
-        return self.movie
+
 
 class ProfileType(DjangoObjectType):
     token = graphene.String()
@@ -128,6 +147,8 @@ class PersonType(DjangoObjectType):
     isFollowed = graphene.Boolean()
     class Meta:
         model = Person
+
+    
     def resolve_isFollowed(self, info, *_):
         if info.context.user.is_authenticated:
             profile = info.context.user.profile
@@ -139,12 +160,18 @@ class PersonType(DjangoObjectType):
     def resolve_images(self,info, *_):
         return self.images.all()
 
+
 class DirectorType(DjangoObjectType):
     data = graphene.types.json.JSONString()
     images = graphene.List(PersonImageType) #for property types
     isFollowed = graphene.Boolean()
+    lenMovies = graphene.Int()
+
     class Meta:
         model = Person
+    def resolve_lenMovies(self,info,*_):
+        return self.movies.count()
+
     def resolve_isFollowed(self, info, *_):
         if info.context.user.is_authenticated:
             profile = info.context.user.profile

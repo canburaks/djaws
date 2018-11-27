@@ -197,9 +197,9 @@ USE_TZ = True
 AWS_ACCESS_KEY_ID = "AKIAJLH2SIQQYCL4TUPA"
 AWS_SECRET_ACCESS_KEY = "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"
 AWS_STORAGE_BUCKET_NAME = "cbs-static"
-
-
-DEFAULT_FILE_STORAGE = 'djaws.storage_backends.MediaStorage'
+AWS_DEFAULT_ACL = "public-read"
+AWS_QUERYSTRING_AUTH = False
+DEFAULT_FILE_STORAGE = "djaws.storage_backends.MediaStorage"
 
 
 ##########################################################################
@@ -215,8 +215,8 @@ STATIC_ROOT = 'static'
 
 MEDIA_ROOT = os.path.join(BASE_DIR, 'static/media') #for upload files
 LOGIN_REDIRECT_URL = "/"
+LOGOUT_REDIRECT_URL = "/logout/"
+LOGOUT_URL = "/logout/"
 """
 LOGIN_URL = "login"
-LOGOUT_URL = "/"
-LOGOUT_REDIRECT_URL = "home"
 """

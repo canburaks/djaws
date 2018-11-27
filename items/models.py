@@ -17,7 +17,7 @@ class Movie(models.Model):
     tmdb_id = models.IntegerField(null=True)
 
     name = models.CharField(max_length=100)
-    year = models.IntegerField(null=True)
+    year = models.IntegerField(null=True, db_index=True)
     summary = models.TextField(max_length=5000,null=True)
 
     imdb_rating = models.DecimalField(max_digits=3, decimal_places=2, blank=True, null=True)
@@ -31,6 +31,8 @@ class Movie(models.Model):
     data = JSONField(default=dict)
     ratings_user = SetTextField(default=set(), base_field=models.CharField(max_length=15),null=True, blank=True)
     ratings_dummy = SetTextField(default=set(), base_field=models.CharField(max_length=15),null=True, blank=True)
+    class Meta:
+        ordering = ["-year"]
     
     @property
     def shortName(self):
@@ -48,6 +50,8 @@ class Movie(models.Model):
     @property
     def image(self):
         return self.poster.url
+
+
 
     def setOmdbInfo(self):
         from .outerApi import omdb_details
@@ -153,13 +157,14 @@ class List(models.Model):
     name = models.CharField(max_length=400)
     summary = models.TextField(max_length=1000,null=True)
     #tags = JSONField(default=dict,blank=True, null=True)
-    movies = models.ManyToManyField(Movie)
-
+    movies = models.ManyToManyField(Movie, related_name="lists")
+    priority =  ListTextField(default = list(),base_field=models.IntegerField(),
+                    max_length=150, null=True, blank=True, help_text="Add movie ids in order. Movies will display in this order. ")
     def __str__(self):
         return self.name
     @cached_property
     def get_movies(self):
-        return self.movies.all().order_by("-imdb_rating")
+        return self.movies.all()
     
     @property
     def image(self):
@@ -171,7 +176,7 @@ class List(models.Model):
     @property
     def items(self):
         aws = settings.MEDIA_URL
-        movies = self.movies.order_by("-imdb_id").defer("imdb_id",
+        movies = self.movies.defer("imdb_id",
                 "tmdb_id","actors","data","ratings_dummy","director","summary","tags","ratings_user")
         movie_dictionary = [{"name":i["name"], "id":i["id"], "poster":"{}{}".format(aws,i["poster"])} for i in movies]
         return movies
@@ -241,3 +246,4 @@ class Article(models.Model):
     
     def __str__(self):
         return self.title
+

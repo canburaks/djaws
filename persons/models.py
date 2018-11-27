@@ -71,7 +71,8 @@ class Profile(models.Model):
 
             r , created = Rating.objects.update_or_create(profile=self, movie=target)
             r.rating = rate
-            r.notes = notes
+            if notes:
+                r.notes = notes
             r.date = date
             r.save()
 
@@ -79,6 +80,10 @@ class Profile(models.Model):
             target.save()
             print("Rate Added")
 
+    def add_rating_history(self, target, rate):
+        import datetime
+        date = datetime.datetime.now().isoformat(timespec='seconds')
+        movid = target.id
 
     def isBookmarked(self,target):
         return target in self.bookmarks.all()

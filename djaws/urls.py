@@ -13,6 +13,10 @@ Including another URLconf
     1. Import the include() function: from django.urls import include, path
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
+from django.contrib import auth
+
+
+
 from django.conf import settings
 from django.contrib.sites.models import Site
 from django.contrib import admin
@@ -25,9 +29,18 @@ from django.views.decorators.csrf import csrf_exempt
 from graphene_django.views import GraphQLView
 from persons.views import HomeList
 from django.views.generic import TemplateView
+from django.contrib import auth
+
+def logout_view(request):
+  auth.logout(request)
+  # Redirect to a success page.
+  return HttpResponseRedirect("/logout/")
+
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+
+    path(r'^logout/$', auth.logout, {'next_page': settings.LOGOUT_REDIRECT_URL}),
 
     path(r'', TemplateView.as_view(template_name="index.html")),
     #path("",HomeList.as_view(), name="home"),

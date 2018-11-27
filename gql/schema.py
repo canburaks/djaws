@@ -1,10 +1,8 @@
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django_mysql.models import JSONField
-from items.models import Movie, List, MovieImage, Video, Topic
+from items.models import Movie,Rating, List, MovieImage, Video, Topic
 from persons.models import Person, Profile, PersonImage, Director
-
-from items.models import Rating
 from algorithm.models import Dummy
 import graphene
 import graphql_jwt
@@ -13,13 +11,18 @@ from graphene_django.types import DjangoObjectType
 from django.db.models import Q
 from graphene_django.converter import convert_django_field
 
-from .types import (VideoType, MovieType, ProfileType, PersonType,
-        DirectorType, TopicType, ListType, UserType, RatingType)
+from .types import (VideoType, MovieType,RatingType, ProfileType, PersonType,
+        DirectorType, TopicType, ListType, UserType)
 
 def paginate(query, first, skip):
     return query[int(skip) : int(skip) + int(first)]
 
+
 class ListQuery(object):
+    list_of_diary = graphene.List(MovieType,
+            first=graphene.Int(default_value=None),
+            skip=graphene.Int(default_value=None))
+
 
     list_of_lists = graphene.List(ListType,
             first=graphene.Int(default_value=None),
@@ -44,6 +47,30 @@ class ListQuery(object):
         name=graphene.String(default_value=None),
         search=graphene.String(default_value=None))
 
+    def resolve_list_of_diary(self, info, **kwargs):
+        first = kwargs.get("first")
+        skip = kwargs.get("skip")
+        user = info.context.user
+        if user.is_authenticated:
+            Q1 = Q(notes__isnull=False)
+            Q2 = Q(date__isnull=False)
+            rates = user.profile.rates.filter(Q1 | Q2)
+            qs = Movie.objects.filter(rates__in=rates).defer("imdb_id",
+                    "tmdb_id","actors","data","ratings_dummy","director","summary",
+                    "tags","ratings_user")
+        if first:
+            return paginate(qs, first, skip)
+        return qs
+
+    def resolve_list_of_ratings(self, info, **kwargs):
+        first = kwargs.get("first")
+        skip = kwargs.get("skip")
+        user = info.context.user
+        if user.is_authenticated:
+            qs =  Rating.objects.filter(profiile__username=user.username)
+            if first:
+                return paginate(qs, first, skip)
+            return qs
 
     def resolve_list_of_directors(self, info, **kwargs):
         first = kwargs.get("first")
@@ -76,41 +103,56 @@ class ListQuery(object):
         name = kwargs.get("name")
         search = kwargs.get("search")
         if id is not None:
+            """
             qs = List.objects.get(id=id).movies.defer("imdb_id",
                     "tmdb_id","actors","data","ratings_dummy","director","summary",
-                    "tags","ratings_user").order_by("-imdb_rating")
+                    "tags","ratings_user")
+            """
+            ls = List.objects.only("movies").get(id=id)
             if first:
-                return paginate(qs, first, skip)
-            return qs
+                return Movie.objects.defer("imdb_id","imdb_rating","summary",
+                            "tmdb_id","actors","director","data","ratings_dummy",
+                            "tags","ratings_user").filter(lists=ls)[skip : skip + first]
+            else:
+                return  Movie.objects.defer("imdb_id","imdb_rating","summary",
+                            "tmdb_id","actors","director","data","ratings_dummy",
+                            "tags","ratings_user").filter(lists=ls)
+
 
         if name is not None:
             user = info.context.user
             if user.is_authenticated:
                 if name=="ratings":
-                    qs = Movie.objects.filter(rates__in=user.profile.rates.only("movie").all()).defer("imdb_id",
-                            "tmdb_id","actors","data","ratings_dummy","director","summary",
-                            "tags","ratings_user")
                     if first:
-                        return paginate(qs, first, skip)
-                    return qs
+                        return Movie.objects.defer("imdb_id","imdb_rating",
+                                "tmdb_id","actors","data","ratings_dummy","director","summary",
+                                "tags","ratings_user").filter(rates__in=user.profile.rates.only("movie"))[skip : skip + first]
+                    else:
+                        return Movie.objects.defer("imdb_id","imdb_rating",
+                                "tmdb_id","actors","data","ratings_dummy","director","summary",
+                                "tags","ratings_user").filter(rates__in=user.profile.rates.only("movie"))
 
                 if name=="bookmarks":
-                    qs = Movie.objects.filter(bookmarked=user.profile).defer("imdb_id",
-                            "tmdb_id","actors","data","ratings_dummy","director","summary",
-                            "tags","ratings_user")
                     if first:
-                        return paginate(qs, first, skip)
-                    return qs
+                        return  Movie.objects.defer("imdb_id","imdb_rating",
+                                "tmdb_id","actors","data","ratings_dummy","director","summary",
+                                "tags","ratings_user").filter(bookmarked=user.profile)[skip : skip + first]
+                    else:
+                        return  Movie.objects.defer("imdb_id","imdb_rating",
+                                "tmdb_id","actors","data","ratings_dummy","director","summary",
+                                "tags","ratings_user").filter(bookmarked=user.profile)        
+
             else :
                 raise Exception('Authentication credentials were not provided')
 
         if search:
             filter = ( Q(name__icontains=search) )
-            qs = Movie.objects.filter(filter).defer("imdb_id","tmdb_id","actors","data",
-                    "ratings_dummy","director","summary","tags","ratings_user")
             if first:
-                return paginate(qs, first, skip)
-            return qs
+                return Movie.objects.defer("imdb_id","imdb_rating","tmdb_id","actors","data",
+                    "ratings_dummy","director","summary","tags","ratings_user").filter(filter)[skip : skip + first]
+            else:
+                return Movie.objects.defer("imdb_id","imdb_rating","tmdb_id","actors","data",
+                    "ratings_dummy","director","summary","tags","ratings_user").filter(filter)
 
     def resolve_length(self, info, **kwargs):
         id = kwargs.get("id")
@@ -133,6 +175,8 @@ class ListQuery(object):
                     return  Director.objects.all().count()
                 elif name=="list_of_topics":
                     return Topic.objects.all().count()
+                elif name=="list_of_diary":
+                    return user.profile.rates.filter(notes__isnull=False).count()
             else :
                 raise Exception('Authentication credentials were not provided')
 
@@ -146,6 +190,8 @@ class ListQuery(object):
 
 
 class Query(ListQuery, graphene.ObjectType):
+    
+    rating = graphene.Field(RatingType,id=graphene.Int())
 
     topic = graphene.Field(TopicType,id=graphene.Int())
 
@@ -157,6 +203,13 @@ class Query(ListQuery, graphene.ObjectType):
 
     movie = graphene.Field(MovieType,id=graphene.Int(),name=graphene.String())
 
+    def resolve_rating(self, info,**kwargs):
+        movid = kwargs.get("id")
+        if info.context.user.is_authenticated:
+            profile = info.context.user.profile
+            rates = profile.rates.get(movie__id=movid)
+            return rates
+            #return Rating.objects.get(profile=profile, movie=Movie.objects.get(id=id))
 
     def resolve_topic(self, info, **kwargs):
         id = kwargs.get("id")
@@ -203,10 +256,11 @@ class Query(ListQuery, graphene.ObjectType):
 
 
 
-from .mutations import CreateUser, Bookmark, Follow, Rating, ObtainJSONWebToken
+from .mutations import CreateUser, Bookmark, Follow, Rating, ObtainJSONWebToken, Logout
 
 class Mutation(graphene.ObjectType):
     follow= Follow.Field()
+    logout = Logout.Field()
     rating = Rating.Field()
     bookmark = Bookmark.Field()
     create_user = CreateUser.Field()
