@@ -1,5 +1,6 @@
 import requests
 tmdb_api_key = "64fdf8453969abf3a5df3c2eac6c367f"
+tmdb_v4 = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJhdWQiOiI2NGZkZjg0NTM5NjlhYmYzYTVkZjNjMmVhYzZjMzY3ZiIsInN1YiI6IjViMGVmZDRhMGUwYTI2NDYxNzAwMDYxOSIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.9mrwDPEZHLsFbcbmBZr5z8mUf7ci_ZmG4lrDpdcMsdc"
 omdb_api = "3f55163d"
 baseUrl = "https://image.tmdb.org/t/p/w185"
 

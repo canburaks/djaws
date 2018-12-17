@@ -49,6 +49,7 @@ INSTALLED_APPS = [
     "gql",
 
     'corsheaders',
+    "storages",
 ]
 
 CORS_ORIGIN_ALLOW_ALL = True
@@ -87,9 +88,7 @@ GRAPHENE = {
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': (
-            os.path.join(BASE_DIR, 'templates'),
-        ),
+        'DIRS': (os.path.join(BASE_DIR, 'templates'),),
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -134,6 +133,7 @@ else:
     }
 CACHE_OPTIONS=[
     {
+        # OLD
     'default': {
         'BACKEND': 'django_redis.cache.RedisCache',
         'LOCATION': [
@@ -144,7 +144,20 @@ CACHE_OPTIONS=[
             "CLIENT_CLASS": "django_redis.client.DefaultClient",
         },
     }
-},{
+},    
+{   #NEW
+    'default': {
+        'BACKEND': 'django_redis.cache.RedisCache',
+        'LOCATION': [
+            "redis://redis-new.drnxuo.ng.0001.euw2.cache.amazonaws.com:6379/1",
+        ],
+        'OPTIONS': {
+
+            "CLIENT_CLASS": "django_redis.client.DefaultClient",
+        },
+    }
+},
+{
     "default": {
         "BACKEND": "django_redis.cache.RedisCache",
         ################################################
@@ -158,7 +171,7 @@ CACHE_OPTIONS=[
     }
 }]
 
-CACHES = CACHE_OPTIONS[0] # 0=>Elasticache 1=>Local Redis
+CACHES = CACHE_OPTIONS[1] # 0=>ElasticacheOld, 1=Elasticache New,  2=>Local Redis
 
 # Password validation
 # https://docs.djangoproject.com/en/2.0/ref/settings/#auth-password-validators
@@ -191,7 +204,19 @@ USE_I18N = True
 USE_L10N = True
 
 USE_TZ = True
+#########################################################################
+#       S3
 
+
+AWS_ACCESS_KEY_ID = "AKIAJLH2SIQQYCL4TUPA"
+AWS_SECRET_ACCESS_KEY = "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"
+AWS_STORAGE_BUCKET_NAME = "cbs-static"
+AWS_DEFAULT_ACL = "public-read"
+AWS_QUERYSTRING_AUTH = False
+DEFAULT_FILE_STORAGE = "djaws.storage_backends.MediaStorage"
+
+
+##########################################################################
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/2.0/howto/static-files/
@@ -204,8 +229,8 @@ STATIC_ROOT = 'static'
 
 MEDIA_ROOT = os.path.join(BASE_DIR, 'static/media') #for upload files
 LOGIN_REDIRECT_URL = "/"
+LOGOUT_REDIRECT_URL = "/logout/"
+LOGOUT_URL = "/logout/"
 """
 LOGIN_URL = "login"
-LOGOUT_URL = "/"
-LOGOUT_REDIRECT_URL = "home"
 """

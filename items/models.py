@@ -3,23 +3,16 @@ from persons.models import Person, Profile
 from django.urls import reverse
 from django_mysql.models import (JSONField, SetTextField, ListTextField, SetCharField)
 from django.utils.functional import cached_property
-
-# Create your models here.
-class List(models.Model):
-    id = models.IntegerField(primary_key=True)
-    name = models.CharField(max_length=400)
-    summary = models.TextField(max_length=1000,null=True)
-    #tags = JSONField(default=dict,blank=True, null=True)
-    movies = models.ManyToManyField("Movie")
-
-    @cached_property
-    def get_movies(self):
-        return self.movies.all().order_by("-imdb_rating")
-    
+from django.conf import settings
 
 def item_image_upload_path(instance, filename):
     return "posters/{0}/{1}".format(instance.movie.id,filename)
 
+def movie_poster_upload_path(instance, filename):
+    return "posters/{0}/{1}".format(instance.id,filename)
+
+def topic_image_upload_path(instance, filename):
+    return "topics/{0}/{1}".format(instance.name, filename)
 
 class Movie(models.Model):
     id = models.IntegerField(primary_key=True)
@@ -27,20 +20,24 @@ class Movie(models.Model):
     tmdb_id = models.IntegerField(null=True)
 
     name = models.CharField(max_length=100)
-    year = models.IntegerField(null=True)
+    year = models.IntegerField(null=True, db_index=True)
     summary = models.TextField(max_length=5000,null=True)
 
     imdb_rating = models.DecimalField(max_digits=3, decimal_places=2, blank=True, null=True)
-    poster = models.ImageField(blank=True, upload_to="posters/")
+    poster = models.ImageField(blank=True, upload_to=movie_poster_upload_path)
     director = models.ForeignKey(Person, on_delete=models.CASCADE, null=True,blank=True, related_name="movies")
-    actors = models.ForeignKey(Person, on_delete=models.CASCADE, null=True,blank=True, related_name="acted")
-    
+
+    people =  models.ManyToManyField(Person,
+        through='persons.Crew', through_fields=('movie', 'person'),null=True, blank=True)
+
     tags = ListTextField(default = list(),base_field=models.CharField(max_length=20),
                     max_length=20, null=True, blank=True)
     
     data = JSONField(default=dict)
     ratings_user = SetTextField(default=set(), base_field=models.CharField(max_length=15),null=True, blank=True)
     ratings_dummy = SetTextField(default=set(), base_field=models.CharField(max_length=15),null=True, blank=True)
+    class Meta:
+        ordering = ["-year"]
     
     @property
     def shortName(self):
@@ -118,7 +115,7 @@ class Movie(models.Model):
         except:
             print("could not get:",self.id, self.name, sep=",")
 
-    def setTmdbInfo(self):
+    def setTmdbInfo(self, force=False):
             from .outerApi import getPosterUrlAndSummary
 
             from django.core import files
@@ -128,7 +125,7 @@ class Movie(models.Model):
                 try:
                     tmdb = self.tmdb_id
                     pUrl, overview, year = getPosterUrlAndSummary(tmdb)
-                    if self.poster=="" or self.poster==None:
+                    if self.poster=="" or self.poster==None or force==True:
                         try:
                             resp = requests.get(pUrl)
                             fp = BytesIO()
@@ -146,6 +143,18 @@ class Movie(models.Model):
                 except:
                     print("error Id:{}".format(self.id))
 
+    def getCastCrew(self):
+        from gql import tmdb_class as t
+        if self.tmdb_id:
+            tmovie = t.Movie(self.tmdb_id)
+            cast, crew = tmovie.credits()
+            if cast:
+                self.data.update({"cast":cast[:8]})
+            if crew:
+                self.data.update({"crew":crew})
+            self.save()
+            
+                
 
 class MovieImage(models.Model):
     movie = models.ForeignKey(Movie, related_name='images', on_delete=models.CASCADE)
@@ -158,6 +167,50 @@ class MovieImage(models.Model):
     def image_info(self):
         return {"info":self.info, "url":self.image.url}
 
+class List(models.Model):
+    id = models.IntegerField(primary_key=True)
+    name = models.CharField(max_length=400)
+    summary = models.TextField(max_length=1000,null=True)
+    #tags = JSONField(default=dict,blank=True, null=True)
+    movies = models.ManyToManyField(Movie, related_name="lists")
+    priority =  ListTextField(default = list(),base_field=models.IntegerField(),
+                    max_length=150, null=True, blank=True, help_text="Add movie ids in order. Movies will display in this order. ")
+    def __str__(self):
+        return self.name
+    @cached_property
+    def get_movies(self):
+        return self.movies.all()
+    
+    @property
+    def image(self):
+        aws = settings.MEDIA_URL
+        posters = self.movies.order_by("?").values("poster")
+        poster_urls = ["{}{}".format(aws,i["poster"]) for i in posters][:10]
+        dictionary = {"id":self.id, "name":self.name, "summary":self.summary, "thumbs":poster_urls}
+        return dictionary
+    @property
+    def items(self):
+        aws = settings.MEDIA_URL
+        movies = self.movies.defer("imdb_id",
+                "tmdb_id","actors","data","ratings_dummy","director","summary","tags","ratings_user")
+        movie_dictionary = [{"name":i["name"], "id":i["id"], "poster":"{}{}".format(aws,i["poster"])} for i in movies]
+        return movies
+
+class Topic(models.Model):
+    id = models.IntegerField(primary_key=True)
+    name = models.CharField(max_length=400)
+    summary = models.TextField(max_length=1000,null=True, blank=True)
+    content = models.TextField(max_length=5000,null=True, blank=True)
+    #tags = JSONField(default=dict,blank=True, null=True)
+    poster = models.ImageField(blank=True, upload_to=topic_image_upload_path)
+    
+    movies = models.ManyToManyField(Movie, null=True, blank=True,  related_name="topics")
+    lists = models.ManyToManyField(List, null=True, blank=True,  related_name="topics")
+    persons = models.ManyToManyField(Person, null=True, blank=True,  related_name="topics")
+
+    def __str__(self):
+        return self.name
+
 class Video(models.Model):
     id = models.IntegerField(primary_key=True)
     title = models.CharField(max_length=150)
@@ -169,8 +222,55 @@ class Video(models.Model):
 
     channel_url = models.URLField(null=True, blank=True, help_text="Youtube channel's main page link")
     channel_name = models.CharField(max_length=150, null=True, blank=True, help_text="Name of the Youtube channel")
+
     related_persons = models.ManyToManyField(Person, blank=True, related_name="videos")
     related_movies = models.ManyToManyField(Movie, blank=True, related_name="videos")
-
+    related_topics = models.ManyToManyField(Topic, blank=True, related_name="videos")
     def __str__(self):
         return self.title
+
+class Article(models.Model):
+    id = models.IntegerField(primary_key=True)
+    name = models.CharField(max_length=250)
+    abstract = models.CharField(max_length=2000, null=True, blank=True)
+    content = models.TextField(max_length=20000, null=True, blank=True)
+    link = models.URLField(null=True, blank=True)
+
+    related_persons = models.ManyToManyField(Person, blank=True, related_name="articles")
+    related_movies = models.ManyToManyField(Movie, blank=True, related_name="articles")
+    related_topics = models.ManyToManyField(Topic, blank=True, related_name="articles")
+    
+    def __str__(self):
+        return self.title
+
+class Rating(models.Model):
+    profile = models.ForeignKey(Profile, related_name='rates', on_delete=models.DO_NOTHING)
+    movie = models.ForeignKey(Movie, related_name='rates', on_delete=models.DO_NOTHING)
+    rating = models.DecimalField(max_digits=2, decimal_places=1, null=True, blank=True)
+
+    notes = models.CharField(max_length=2500, blank=True, null=True)
+    date = models.DateField(null=True, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ("profile","movie",)
+
+    def __str__(self):
+        return "Profile: {}, Movie: {}, Ratings:{}".format(self.profile, self.movie,self.rating)
+
+class Prediction(models.Model):
+    profile = models.ForeignKey(Profile, related_name='predictions', on_delete=models.DO_NOTHING)
+    profile_points = models.IntegerField()
+
+    movie = models.ForeignKey(Movie, related_name='predictions', on_delete=models.DO_NOTHING)
+    prediction = models.DecimalField(max_digits=2, decimal_places=1, null=True, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+
+
+    def __str__(self):
+        return "Profile: {}, Movie: {}, Prediction:{}".format(self.profile, self.movie,self.prediction)

@@ -1,184 +1,145 @@
 from django.db import models
-from django.core.cache import cache
 import os, sys, inspect
+import random
+import numpy as np
+from django.core.cache import cache
 cmd_subfolder = os.path.realpath(os.path.abspath(os.path.join(os.path.split(inspect.getfile( inspect.currentframe() ))[0],"cython")))
 if cmd_subfolder not in sys.path:
     sys.path.insert(0, cmd_subfolder)
-
-
-import cfunctions as c
-average = c.average
-getKeySet = c.getKeySet
-getKeySetS = c.getKeySetS
-getValueSet = c.getValueSet
-intersection = c.intersection
-pearson = c.pearson
-predict = c.predict
-voterSet = c.MovieVoters
+import calculations as af
 
 
 
-# Create your models here.
-
-
-
-class Dummy():
-    Votes = cache
-
-
-
-
-    @classmethod
-    def mean(cls,id):
-        return c.average(cls.Votes.get(str(id)))
-
-
-
-
-    @classmethod
-    def greatDict(cls, movid):
-        "Bring users that rated target movie and their all votes"
+from items.models import Movie
+class Ms():
+    def __init__(self, movie_id):
         from items.models import Movie
-        userList = Movie.objects.get(id=movid).ratings_dummy
-        dic = {key:cls.Votes.get(key) for key in userList}
-        "{'key': {2571:4.0}, ... }"
-        return dic
+        if isinstance(movie_id, Movie):
+            self.movie_id = "m{}".format(movie_id.id)
+        elif isinstance(movie_id, int ):
+            self.movie_id = "m{}".format(movie_id)
+        elif isinstance(movie_id, str) and not movie_id.startswith("m"):
+            self.movie_id = "m{}".format(movie_id)
+        elif isinstance(movie_id, str) and movie_id.startswith("m"):
+            self.movie_id = movie_id
 
+    @property
+    def userset(self):
+        return cache.get(self.movie_id)
+    
+    def commons(self, other_movie):
+        return np.intersect1d(np.array(self.userset), np.array(other_movie.userset))
 
-    @classmethod
-    def prediction(cls, profile, target):
-        movid = target.id
+    def commons_length(self, other_movie):
+        return np.intersect1d(np.array(self.userset), np.array(other_movie.userset)).shape[0]
 
-        profileVotes = {int(key): value for key,value in profile.ratings.items()}
-        "{ '2571': 4, '1' : 3.5, ...}" # to {2571 : 4, 1:}
-        profileMean = c.average(profileVotes)
-        greatDict = cls.greatDict(movid)
-        "{'157000': {2571:4.0}, ... }"
+class Rs():
+    def __init__(self, user_id):
+        self.ratings = cache.get(user_id)
+    
+    """
+    property
+    def ratings(self):
+        return cache.get(self.user_id)
+    """
 
-        lowerLimit = 15 #len(profileVotes)//2
-        #middleLimit = 10
-        commons = dict()
-        for d in greatDict.keys():
-            interectionQuantity = len(intersection(profileVotes, greatDict.get(d)))
-            if interectionQuantity >= lowerLimit:
-                commons.update({d:interectionQuantity})
-        #if len(commons)<50:
-        #    for d in greatDict.keys():
-        #        interectionQuantity = len(intersection(profileVotes, greatDict.get(d)))
-        #        if interectionQuantity > middleLimit:
-        #            commons.update({d:interectionQuantity})
-        if len(commons.items())<40:
-            for d in greatDict.keys():
-                interectionQuantity = len(intersection(profileVotes, greatDict.get(d)))
-                if interectionQuantity > 10 and interectionQuantity<15:
-                    commons.update({d:interectionQuantity})
+    @property
+    def movieset(self):
+        return np.array([x for x in self.ratings.keys()], dtype=np.uint32)
 
-        NQ= sorted(commons.items(), key=lambda x:x[1], reverse=True)[:100]
-        "[ ('157000', 5)....]"
-        print("{} number of Neighbours brought".format(len(NQ)))
+    @property
+    def average(self):
+        return af.mean(self.ratings)
 
-        PQ = []
-        for n in NQ:
-            dummyId = n[0] # "157000"
-            dummyVotes = greatDict.get(dummyId)
-            vbar = cls.mean(dummyId)
-            corr = c.pearson(profileVotes, dummyVotes)
-            rate = dummyVotes.get(target.id)
-            if corr>0.2:
-                PQ.append(( vbar, corr, rate ))
-        PQsorted = sorted(PQ, key=lambda x: x[1], reverse=True)[:20]
-        print("Number of correlated Neigbours:{}".format(len(PQ)))
-        if len(PQ)<4:
+    def commons(self,other_user):
+        umovies = self.movieset
+        vmovies = other_user.movieset
+        return np.intersect1d(umovies, vmovies)
+    
+    def commons_length(self, other_user):
+        return np.intersect1d( self.movieset, other_user.movieset).shape[0] 
+    
+    def vector(self, common_movies):
+        return np.array([self.ratings.get(str(x)) for x in common_movies ], dtype=np.float64)
+    
+    def normalized_vector(self, common_movies):
+        self_vector = self.vector(common_movies)
+        mean_vector = np.full(len(common_movies), self.average)
+        return self_vector - mean_vector
+
+    def pearson(self, other_user):
+        common_movies = self.commons(other_user)
+        if len(common_movies)>0:
+            self_vector = self.vector(common_movies)
+            other_vector = other_user.vector(common_movies)
+            ubar = self.average
+            vbar = self.average
+            return af.pearson(self_vector, other_vector, ubar, vbar)
+        else:
             return 0
 
-        pred = predict(PQsorted, profileMean)
-        greatDict = {}
-        if pred>5:
-            return 4.87
-        elif pred>4 and pred<5:
-            return pred - 0.1
-        elif pred<0:
-            return 0
-        return pred - 0.1
+    def final_calculation(self,list_of_highly_correlated_users, movie_id):
+        # [ [average, rating_of_target_movie, correlation],[]...]
+        userlist = [[x[0].average, x[0].ratings.get(movie_id), x[1]] for x in list_of_highly_correlated_users]
+        return af.final(userlist)
+        
+
+    def prediction(self,movie):
+        if isinstance(movie, Movie):
+            movid = str(movie.id)
+        elif isinstance(movie, int):
+            movid = str(movie)
+        elif isinstance(movie, str):
+            movid = movie
+        else:
+            print("no movie id")
+        movie_all_userset = Ms(movie).userset
+        length_of_movie_userset = len(movie_all_userset)
+        if length_of_movie_userset>8000:
+            movie_userset = random.sample(movie_all_userset, 8000)
+        else:
+            movie_userset = movie_all_userset
+        print("{} of users that rated target movie".format(len(movie_userset)))
+        users_that_have_commons = {}
+        for user_id in movie_userset:
+            rs_user = Rs(user_id)
+
+            if len(movie_userset)>7000:
+                minimum_common_threshold = 24
+            elif len(movie_userset)>2000 and len(movie_userset)<7000:
+                minimum_common_threshold = 19
+            else:
+                minimum_common_threshold = 12
+            
+            if self.commons_length(rs_user)>minimum_common_threshold:
+                users_that_have_commons.update({ rs_user:self.commons_length(rs_user) })
+        neighbours_that_max_shared = sorted(users_that_have_commons.items(), key=lambda x:x[1], reverse=True)[:300]
+        print("Neighbours that brought:{}".format(len(neighbours_that_max_shared)))
+        
+        users_with_pearson = {}
+        for neighbour in neighbours_that_max_shared:
+            correlation = self.pearson(neighbour[0])
+            if correlation>0.2:
+                users_with_pearson.update({ neighbour[0] : correlation })
+        
+        highest_correlated_users = sorted(users_with_pearson.items(), key=lambda x:x[1], reverse=True)[:20]
+        print("{} number of Highest correlated person".format(len(highest_correlated_users)))
+        pred = self.average + self.final_calculation(highest_correlated_users, str(movid))
+        
+        if pred>5 or pred<=0:
+                return 0
+        elif (pred>=4.4) and (pred<4.6):
+            return 4.2
+        elif (pred>=4.6) and (pred<4.8):
+            return 4.3
+        elif (pred>=4.8) and (pred<5):
+            return 4.4
+        elif pred==5:
+            return 4.5
+        return pred - 0.2
 
 
 
-"""
-def opening():
-    import _pickle as pickle
-    import bz2
-    with bz2.BZ2File("static/pickles/newdummies.pbz2","r") as f:
-        p = pickle.load(f)
-    for d in p.keys():
-        cache.set(d,p.get(d),None)
-    print("\n Dummies added\n")
-opening()
 
 
-def opening():
-    import _pickle as pickle
 
-    with open("static/sixtyP4.pickle","rb") as f:
-        p = pickle.load(f)
-        Dummy.Votes.update(p)
-opening()
-
-
-MODEL_BUCKET = os.environ['MODEL_BUCKET']
-MODEL_FILENAME = os.environ['MODEL_FILENAME']
-MODEL = None
-def load_model():
-    import _pickle as pickle
-    from google.cloud import storage
-    global MODEL
-    client = storage.Client()
-    bucket = client.get_bucket(MODEL_BUCKET)
-    blob = bucket.get_blob(MODEL_FILENAME)
-    s = blob.download_as_string()
-
-    MODEL = pickle.loads(s)
-    Dummy.Votes.update(MODEL)
-
-load_model()
-
-def opening():
-    import _pickle as pickle
-    import bz2
-    with bz2.BZ2File("static/Midi.pbz2","r") as f:
-        p = pickle.load(f)
-        Dummy.Votes.update(p)
-opening()
-
-def getVotes():
-    import gcsfs
-    import _pickle as pickle
-    import bz2
-    fs = gcsfs.GCSFileSystem(project='discovery-214900', token="cloud")
-    with fs.open('discoverystatic/static/shelve/pickle.pbz2') as f:
-        with bz2.BZ2File(f) as pb:
-            p = pickle.load(pb)
-            Dummy.Votes.update(p)
-getVotes()
-
-
-TOKEN = os.environ['MODEL_BUCKET']
-
-
-with open("/home/cbs/Documents/Pickle/Big.pickle","rb") as f:
-    Dummy.Votes = pickle.load(f)
-
-MODEL_BUCKET = os.environ['MODEL_BUCKET']
-MODEL_FILENAME = os.environ['MODEL_FILENAME']
-
-def load_model():
-    import _pickle as pickle
-    from google.cloud import storage
-    client = storage.Client()
-    bucket = client.get_bucket(MODEL_BUCKET)
-    blob = bucket.get_blob(MODEL_FILENAME)
-    s = blob.download_as_string()
-
-    Dummy.Votes = pickle.loads(s)
-
-load_model()
-"""
