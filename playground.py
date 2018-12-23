@@ -146,3 +146,15 @@ def auto_create(start, batch_size, stop):
 
 ################################################################3
 
+def summart(start, stop):
+    from tqdm import tqdm
+    allm = Movie.objects.order_by("id").defer("ratings_dummy","ratings_user")
+
+    for m in tqdm(allm[start: stop]):
+        summary = m.summary
+        data = m.data
+        if data:
+            pl = data.get("Plot")
+            if pl and len(pl)>len(summary):
+                m.summary = pl
+                m.save()

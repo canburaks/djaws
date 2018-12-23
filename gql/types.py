@@ -1,5 +1,5 @@
 from items.models import Rating,Movie, List, MovieImage, Video, Topic
-from persons.models import Person, Profile, PersonImage, Director
+from persons.models import Person, Profile, PersonImage, Director, Crew
         
 from django.contrib.auth import get_user_model
 
@@ -100,7 +100,15 @@ class MovieType(DjangoObjectType):
             user= info.context.user
             return user.profile.ratings.get(str(self.id))
     def resolve_data(self,info,*_):
-        return self.data
+        data = self.data
+        new_data = {}
+        new_data["Plot"] = data.get("Plot")
+        new_data["Director"] = data.get("Director")
+        new_data["Country"] = data.get("Country")
+        new_data["Runtime"] = data.get("Runtime")
+        return new_data
+
+
     def resolve_tags(self, info, *_):
         return self.tags
 
@@ -139,6 +147,7 @@ class PersonType(DjangoObjectType):
     poster = graphene.String()
     images = graphene.List(PersonImageType) #for property types
     isFollowed = graphene.Boolean()
+    movies = graphene.List(MovieType)
     class Meta:
         model = Person
 
@@ -157,6 +166,17 @@ class PersonType(DjangoObjectType):
     def resolve_poster(self, info, *_):
         if self.poster:
             return self.poster.url
+    
+    def resolve_movies(self, info, *_):
+        crew_qs = Crew.objects.filter(person=self).select_related("movie").defer("job","character")
+        return list(set([x.movie for x in crew_qs]))
+class CrewType(DjangoObjectType):
+    person = graphene.Field(PersonType)
+    class Meta:
+        model = Crew
+    
+    def resolve_person(self, info, *_):
+        return self.person
 
 class DirectorType(DjangoObjectType):
     data = graphene.types.json.JSONString()

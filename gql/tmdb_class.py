@@ -204,7 +204,7 @@ class Tv:
 
 ######################################################################
 
-
+"""
 # ASYNC REQUESTS
 import _pickle as pickle
 import aiohttp
@@ -252,3 +252,4 @@ def sget_details(dic, start, stop):
     print(time.time() - start_time)
 
 sget_details(tmdb_person_dict, 0,20)
+"""

@@ -2,7 +2,7 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django_mysql.models import JSONField
 from items.models import Movie,Rating, List, MovieImage, Video, Topic
-from persons.models import Person, Profile, PersonImage, Director
+from persons.models import Person, Profile, PersonImage, Director, Crew
 import graphene
 import graphql_jwt
 from graphql_jwt.decorators import login_required
@@ -12,13 +12,15 @@ from graphene_django.converter import convert_django_field
 from graphene_django.debug import DjangoDebug
 
 from .types import (VideoType, MovieType,RatingType, ProfileType, PersonType,
-        DirectorType, TopicType, ListType, UserType)
+        DirectorType, TopicType, ListType, UserType, CrewType)
 
 def paginate(query, first, skip):
     return query[int(skip) : int(skip) + int(first)]
 
 
 class ListQuery(object):
+    list_of_crew = graphene.List(CrewType, movie_id=graphene.Int())
+
     list_of_diary = graphene.List(MovieType,
             first=graphene.Int(default_value=None),
             skip=graphene.Int(default_value=None))
@@ -47,6 +49,16 @@ class ListQuery(object):
         name=graphene.String(default_value=None),
         search=graphene.String(default_value=None))
 
+
+    def resolve_list_of_crew(self, info, **kwargs):
+        movie_id = kwargs.get("movie_id")
+        show_jobs = ["d", "a"]
+        qs = Crew.objects.filter(movie=Movie.objects.get(id=movie_id),
+            job__in=show_jobs, person__bio__isnull=False).select_related("person").defer("data").exclude(
+                person__bio__isnull=True).exclude(person__bio__exact='')
+        return qs
+
+    
     def resolve_list_of_diary(self, info, **kwargs):
         first = kwargs.get("first")
         skip = kwargs.get("skip")
@@ -190,7 +202,7 @@ class ListQuery(object):
 
 
 class Query(ListQuery, graphene.ObjectType):
-    debug = graphene.Field(DjangoDebug, name='__debug')
+    #debug = graphene.Field(DjangoDebug, name='__debug')
     
     rating = graphene.Field(RatingType,id=graphene.Int())
 
