@@ -20,8 +20,11 @@ django-cognito-jwt==0.0.1
 django-cors-headers==2.4.0
 django-crispy-forms==1.7.2
 django-extensions==2.1.2
+django-filebrowser==3.11.1
 django-filter==2.0.0
+django-grappelli==2.12.1
 django-graphql-jwt==0.1.13
+django-import-export==1.1.0
 django-mysql==2.4.1
 django-redis==4.9.0
 django-rest-knox==3.1.5

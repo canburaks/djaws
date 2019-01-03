@@ -33,7 +33,8 @@ ALLOWED_HOSTS = ["*",
 # Application definition
 import datetime
 INSTALLED_APPS = [
-
+    'grappelli',
+    'filebrowser',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -52,6 +53,9 @@ INSTALLED_APPS = [
 
     'corsheaders',
     "storages",
+
+    'import_export',
+
 ]
 
 #CORS_ORIGIN_ALLOW_ALL = True

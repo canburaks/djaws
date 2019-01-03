@@ -38,7 +38,18 @@ class Movie(models.Model):
     ratings_dummy = SetTextField(default=set(), base_field=models.CharField(max_length=15),null=True, blank=True)
     class Meta:
         ordering = ["-year"]
+
+    def __str__(self):
+        return self.name
     
+    @staticmethod
+    def autocomplete_search_fields():
+        return ("id__iexact", "name__icontains",)
+
+    @property
+    def mini_data(self):
+        data_keys = ["Country", "Genre", "Runtime", "Language"]
+
     @property
     def shortName(self):
         if len(self.name)>10:
@@ -46,8 +57,6 @@ class Movie(models.Model):
         else:
             return self.name
 
-    def __str__(self):
-        return self.name
     def get_absolute_url(self):
         "Returns the url to access a particular movie instance."
         return reverse('movie-detail', args=[str(self.id)])
@@ -177,6 +186,11 @@ class List(models.Model):
                     max_length=150, null=True, blank=True, help_text="Add movie ids in order. Movies will display in this order. ")
     def __str__(self):
         return self.name
+    
+    @staticmethod
+    def autocomplete_search_fields():
+        return ("id__iexact", "name__icontains",)
+
     @cached_property
     def get_movies(self):
         return self.movies.all()
@@ -210,6 +224,9 @@ class Topic(models.Model):
 
     def __str__(self):
         return self.name
+    @staticmethod
+    def autocomplete_search_fields():
+        return ("id__iexact", "name__icontains",)
 
 class Video(models.Model):
     id = models.IntegerField(primary_key=True)
@@ -219,7 +236,8 @@ class Video(models.Model):
     tags = ListTextField(default = list(),base_field=models.CharField(max_length=40),
                     null=True, help_text="Enter the type of video category.\n E.g:'video-essay or interview or conversations'")
     duration = models.IntegerField(null=True,blank=True, help_text="seconds")
-
+    thumbnail = models.URLField(null=True, blank=True, help_text="Thumbnail url if exists.")
+    youtube_id = models.CharField(max_length=50, null=True, blank=True, help_text="Youtube video id, if video is on TouTube.")
     channel_url = models.URLField(null=True, blank=True, help_text="Youtube channel's main page link")
     channel_name = models.CharField(max_length=150, null=True, blank=True, help_text="Name of the Youtube channel")
 
@@ -228,6 +246,9 @@ class Video(models.Model):
     related_topics = models.ManyToManyField(Topic, blank=True, related_name="videos")
     def __str__(self):
         return self.title
+    @staticmethod
+    def autocomplete_search_fields():
+        return ("id__iexact", "title__icontains",)
 
 class Article(models.Model):
     id = models.IntegerField(primary_key=True)
@@ -242,7 +263,10 @@ class Article(models.Model):
     
     def __str__(self):
         return self.title
-
+    @staticmethod
+    def autocomplete_search_fields():
+        return ("id__iexact", "name__icontains",)
+        
 class Rating(models.Model):
     profile = models.ForeignKey(Profile, related_name='rates', on_delete=models.DO_NOTHING)
     movie = models.ForeignKey(Movie, related_name='rates', on_delete=models.DO_NOTHING)

@@ -1,5 +1,7 @@
 from django.contrib import admin
+from import_export.admin import ImportExportModelAdmin
 from .models import Video, List, Movie, MovieImage, Topic, Article, Rating, Prediction
+from items.resources import ArticleResource, VideoResource
 
 class VideoMovieInline(admin.TabularInline):
     model = Video.related_movies.through
@@ -25,12 +27,8 @@ class MovieImageAdmin(admin.ModelAdmin):
 @admin.register(Movie)
 class MovieAdmin(admin.ModelAdmin):
     list_display = ("id",'name',"year","imdb_id","tmdb_id", "imdb_rating","get_data_director" )
-    inlines = [ImageMovieInline, ListMovieInline, TopicMovieInline, ArticleMovieInline]
+    inlines = [ImageMovieInline, ListMovieInline, TopicMovieInline]
     search_fields = ('name', 'imdb_id',"tmdb_id", 'id', )
-    list_select_related = (
-        'director',
-    )
-
     def get_data_director(self, obj):
         if obj.data:
             return obj.data.get("Director")
@@ -42,12 +40,21 @@ class MovieAdmin(admin.ModelAdmin):
 class ListAdmin(admin.ModelAdmin):
     list_display = ("id",'name',"summary")
     raw_id_fields = ['movies',]
-
+    autocomplete_lookup_fields = {
+        #'fk': ['related_fk'],
+        'm2m': ['movies',],
+    }
 @admin.register(Video)
-class VideoAdmin(admin.ModelAdmin):
+class VideoAdmin(ImportExportModelAdmin):
     list_display = ("id",'title',"link")
-    search_fields = ('id',"related_persons", 'title',"summary", )
+    search_fields = ('id','title',"tags" )
     raw_id_fields = ['related_movies', 'related_persons', 'related_topics']
+    resource_class = VideoResource
+
+    autocomplete_lookup_fields = {
+        #'fk': ['related_fk'],
+        'm2m': ['related_persons',"related_movies", "related_topics", ],
+    }
 
 @admin.register(Topic)
 class TopicAdmin(admin.ModelAdmin):
@@ -55,10 +62,7 @@ class TopicAdmin(admin.ModelAdmin):
     inlines = [VideoTopicInline,]
     raw_id_fields = ['movies', 'persons', 'lists',]
     
-@admin.register(Article)
-class ArticleAdmin(admin.ModelAdmin):
-    list_display = ("id",'name',)
-    raw_id_fields = ['related_movies', 'related_persons', 'related_topics']
+
 
 @admin.register(Rating)
 class RatingAdmin(admin.ModelAdmin):
@@ -73,3 +77,11 @@ class PredictionAdmin(admin.ModelAdmin):
 
 
 
+
+
+
+@admin.register(Article)
+class ArticleAdmin(ImportExportModelAdmin):
+    list_display = ("id",'name',)
+    raw_id_fields = ['related_movies', 'related_persons', 'related_topics']
+    resource_class = ArticleResource

@@ -116,13 +116,15 @@ class Profile(models.Model):
                 self.save()
 
 
-    def predict(self, target, **kwargs):
+    def predict(self, target,zscore=True):
+        print(target.name)
         if str(target.id) in self.ratings.keys():
             return 0
         from algorithm.models import  Rs
         from items.models import Prediction
         rs_user = Rs(str(self.user.id))
-        result =  rs_user.prediction(target)
+
+        result =  rs_user.prediction(target, zscore=zscore)
         result = round(result,1)
         points = self.points
 
@@ -156,12 +158,13 @@ class Person(models.Model):
     active = models.BooleanField(default=False, help_text="if ready for show on web page make it true")
     poster = models.ImageField(blank=True, upload_to=person_poster_upload_path)
     
-    #relations = models.ManyToManyField("self", blank=True)
-
 
     def __str__(self):
         return self.name
-
+        
+    @staticmethod
+    def autocomplete_search_fields():
+        return ("id__iexact", "name__icontains",)
 
 class Crew(models.Model):
     movie = models.ForeignKey("items.Movie", on_delete=models.CASCADE)

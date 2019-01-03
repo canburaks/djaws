@@ -16,6 +16,24 @@ def mean(dict ratings):
         num += 1
     return total / num
 
+@cython.boundscheck(False)
+def variance(dict ratings):
+    ubar = mean(ratings)
+    cdef double u
+    cdef double sum = 0.0
+    cdef unsigned int len =0
+    for i in ratings.values():
+        sum += pow(i-ubar, 2)
+        len +=1
+    if len>0:
+        return sum / len
+    else:
+        print("function Variance has no length!! ")
+        return 0
+
+def stdev(dict ratings):
+    cdef double varyans = variance(ratings)
+    return sqrt(varyans)
 
 cdef double calculate(double top, double bl, double br):
     cdef double result
@@ -68,4 +86,45 @@ def final(list userlist):
         if sum_of_correlation!=0:
             return top / sum_of_correlation
         else:
+            print("final function: top/sum_of_correlation = 0")
             return 0
+
+def z_final(list userlist):
+    cdef list single_user
+    cdef double vbar, vstdev, correlation, rate, result
+    cdef double top=0.0, sum_of_correlation=0.0
+
+    for single_user in userlist:
+        vbar = single_user[0]
+        vstdev = single_user[1]
+        rate = single_user[2]
+        correlation = amplification(single_user[3])
+
+        top += correlation*(rate - vbar)/vstdev
+        sum_of_correlation += fabs(correlation)
+
+        if sum_of_correlation!=0:
+            return top / sum_of_correlation
+        else:
+            print("final function: top/sum_of_correlation = 0")
+            return 0
+
+def acs(list collection):
+    cdef tuple user_rates
+    cdef unsigned int length = len(collection)
+    cdef Py_ssize_t i 
+    
+    cdef double top = 0.0
+    cdef double bl = 0.0
+    cdef double br = 0.0
+
+    for i in range(length):
+        user_rates = collection[i]
+        top += (user_rates[1] - user_rates[0]) * (user_rates[2] - user_rates[0])
+        bl += pow(user_rates[1] - user_rates[0], 2)
+        br += pow(user_rates[2] - user_rates[0], 2)
+    
+    if bl*br!=0:
+        return calculate(top, bl, br)
+    else:
+        return 0

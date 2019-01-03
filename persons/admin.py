@@ -18,11 +18,24 @@ class ProfileAdmin(admin.ModelAdmin):
 
 @admin.register(Person)
 class PersonAdmin(admin.ModelAdmin):
-    list_display = ("id","tmdb_id",'name',"job")
-    list_filter = ('active',"job")
+    list_display = ("id",'name',)
+    list_filter = ('active',)
     inlines = [ImagePersonInline,]
     list_display_links = ("name",)
     search_fields = ('name', 'id', )
+
+@admin.register(Crew)
+class CrewAdmin(admin.ModelAdmin):
+    list_display = ('person',"movie",)
+    #inlines = [ImagePersonInline,]
+    list_display_links = ("person",)
+    search_fields = ('person', 'movie', )
+
+    autocomplete_lookup_fields = {
+        'fk': ['movie', "person"],
+        #'m2m': ['related_persons',"related_movies", "related_topics", ],
+    }
+
 
 @admin.register(Director)
 class DirectorAdmin(admin.ModelAdmin):
@@ -39,7 +52,3 @@ class ActorAdmin(admin.ModelAdmin):
 @admin.register(PersonImage)
 class PersonImageAdmin(admin.ModelAdmin):
     list_display = ("id","person","info","image" )
-
-@admin.register(Crew)
-class CrewAdmin(admin.ModelAdmin):
-    list_display = ("person",'movie',"job")

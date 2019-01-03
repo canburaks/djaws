@@ -30,6 +30,7 @@ from graphene_django.views import GraphQLView
 from persons.views import HomeList
 from django.views.generic import TemplateView
 from django.contrib import auth
+from filebrowser.sites import site
 
 def logout_view(request):
   auth.logout(request)
@@ -38,6 +39,8 @@ def logout_view(request):
 
 
 urlpatterns = [
+    path('admin/filebrowser/', site.urls),
+    path('grappelli/', include('grappelli.urls')), # grappelli URLS
     path('admin/', admin.site.urls),
 
    # path(r'^logout/$', auth.logout, {'next_page': settings.LOGOUT_REDIRECT_URL}),
