@@ -2,7 +2,9 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django_mysql.models import JSONField
 from items.models import Movie,Rating, List, MovieImage, Video, Topic
-from persons.models import Person, Profile, PersonImage, Director, Crew
+from persons.models import Person, PersonImage, Director, Crew
+from persons.profile import Profile, Follow
+
 import graphene
 import graphql_jwt
 from graphql_jwt.decorators import login_required
@@ -11,11 +13,23 @@ from django.db.models import Q
 from graphene_django.converter import convert_django_field
 from graphene_django.debug import DjangoDebug
 
-from .types import (VideoType, MovieType,RatingType, ProfileType, PersonType,
+from .types import (VideoType, MovieType,RatingType, ProfileType,ProfileType2, PersonType,
         DirectorType, TopicType, ListType, UserType, CrewType)
 
 def paginate(query, first, skip):
     return query[int(skip) : int(skip) + int(first)]
+
+def multi_word_search(text):
+    text = text.replace("'" , " ")
+    text = text.replace("," , " ")
+    text_filtered = text.split(" ")
+    word_list = list(filter(lambda x: len(x)>1 and (x.lower() !="the"), text_filtered))
+    word_list = list(map( lambda x: x.lower(), word_list ))
+    return word_list
+
+def multi_word_query(*arg):
+    if len(arg)==1:
+        one_word = ( Q(name__icontains=arg[0]) )
 
 
 class ListQuery(object):
@@ -34,7 +48,8 @@ class ListQuery(object):
             first=graphene.Int(default_value=None),
             skip=graphene.Int(default_value=None))
 
-    liste = graphene.List(MovieType, id=graphene.Int(default_value=None),
+    liste = graphene.List(MovieType, 
+            id=graphene.Int(default_value=None),
             name=graphene.String(default_value=None),
             search=graphene.String(default_value=None),
             first=graphene.Int(default_value=None),
@@ -130,7 +145,6 @@ class ListQuery(object):
                             "tmdb_id","director","data","ratings_dummy",
                             "tags","ratings_user").filter(lists=ls)
 
-
         if name is not None:
             user = info.context.user
             if user.is_authenticated:
@@ -158,13 +172,50 @@ class ListQuery(object):
                 raise Exception('Authentication credentials were not provided')
 
         if search:
-            filter = ( Q(name__icontains=search) )
-            if first:
-                return Movie.objects.defer("imdb_id","imdb_rating","tmdb_id","data",
-                    "ratings_dummy","director","summary","tags","ratings_user").filter(filter)[skip : skip + first]
-            else:
-                return Movie.objects.defer("imdb_id","imdb_rating","tmdb_id","data",
-                    "ratings_dummy","director","summary","tags","ratings_user").filter(filter)
+            words = multi_word_search(search)
+            if len(words)==1:
+                filter = ( Q(name__icontains=words[0]) )
+                if first:
+                    return Movie.objects.defer("imdb_id","imdb_rating","tmdb_id","data",
+                        "ratings_dummy","director","summary","tags","ratings_user").filter(filter)[skip : skip + first]
+                else:
+                    return Movie.objects.defer("imdb_id","imdb_rating","tmdb_id","data",
+                        "ratings_dummy","director","summary","tags","ratings_user").filter(filter)
+            elif len(words)>1:
+                term1 = " ".join(words)
+                filter1 = ( Q(name__icontains=term1))
+                qs1 = Movie.objects.defer("imdb_id","imdb_rating","tmdb_id","data",
+                        "ratings_dummy","director","summary","tags","ratings_user").filter(filter1)
+                result = [x for x in qs1]
+
+
+                filter2 = (Q(name__icontains=words[0]))
+                qs2 = Movie.objects.defer("imdb_id","imdb_rating","tmdb_id","data",
+                        "ratings_dummy","director","summary","tags","ratings_user").filter(filter2)
+
+                for i in range(1, len(words)):
+                    kw = words[i]
+                    qs2 = qs2.filter(Q(name__icontains=kw))
+
+                for mov in qs2:
+                    result.append(mov)
+
+                result = list(set(result))
+                """
+                for word in words:
+                    if len(word)>4:
+                        filter2 = ( Q(name__icontains=word) )
+                        qs2 = Movie.objects.defer("imdb_id","imdb_rating","tmdb_id","data",
+                            "ratings_dummy","director","summary","tags","ratings_user").filter(filter2)
+                        for mov in qs2:
+                            result.append(mov)
+                """
+                if first:
+                    return result[ skip : skip + first ]
+
+                else:
+                    return result
+
 
     def resolve_length(self, info, **kwargs):
         id = kwargs.get("id")
@@ -184,7 +235,7 @@ class ListQuery(object):
                 elif name=="list_of_lists":
                     return List.objects.all().count()
                 elif name=="list_of_directors":
-                    return  Director.objects.all().count()
+                    return  Director.objects.filter(active=True).count()
                 elif name=="list_of_topics":
                     return Topic.objects.all().count()
                 elif name=="list_of_diary":
@@ -199,7 +250,7 @@ class ListQuery(object):
             )
             return Movie.objects.filter(filter).count()
 
-
+    
 
 class Query(ListQuery, graphene.ObjectType):
     #debug = graphene.Field(DjangoDebug, name='__debug')
@@ -212,18 +263,35 @@ class Query(ListQuery, graphene.ObjectType):
 
     person = graphene.Field(PersonType,id=graphene.String(default_value=None))
 
-    viewer = graphene.Field(ProfileType, username=graphene.String())
+    viewer = graphene.Field(ProfileType2, username=graphene.String())
 
+    profile = graphene.Field(ProfileType, username=graphene.String())
+    
     movie = graphene.Field(MovieType,id=graphene.Int(),name=graphene.String())
 
     dummy =  graphene.types.json.JSONString(id=graphene.String())
+
+
+    def resolve_profile(self, info, **kwargs):
+        username = kwargs.get("username")
+        user = info.context.user
+        if not user.is_authenticated:
+            raise Exception('Authentication credentials were not provided')
+            return None
+        elif info.context.user.is_authenticated:
+            user = info.context.user
+            if user.username==username:
+                is_self=True
+                return user.profile
+            else:
+                is_self=False
+            return Profile.objects.get(username=username)
 
     def resolve_dummy(self, info, **kwargs):
         from django.core.cache import cache
         id = kwargs.get("id")
         return cache.get(id)
         
-
     def resolve_rating(self, info,**kwargs):
         movid = kwargs.get("id")
         if info.context.user.is_authenticated:
@@ -280,12 +348,13 @@ class Query(ListQuery, graphene.ObjectType):
             return Movie.objects.get(name=name)
 
 
-from .mutations import CreateUser, Bookmark, Follow, Rating, ObtainJSONWebToken, Logout, DummyMutation, RedisMutation
+from .mutations import CreateUser, Bookmark, Follow, Rating, ObtainJSONWebToken, Logout, DummyMutation, RedisMutation, Fav
 
 class Mutation(graphene.ObjectType):
     #redis = RedisMutation.Field()
     dummy = DummyMutation.Field()
     follow= Follow.Field()
+    fav= Fav.Field()
     logout = Logout.Field()
     rating = Rating.Field()
     bookmark = Bookmark.Field()

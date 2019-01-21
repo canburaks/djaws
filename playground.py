@@ -158,3 +158,49 @@ def summart(start, stop):
             if pl and len(pl)>len(summary):
                 m.summary = pl
                 m.save()
+
+####################################################3
+# cbs = Profile.objects.get(id=1)
+# 
+plist = Profile.objects.all()
+
+def create_follow_person(profile):
+    qs = profile.follow_persons.all()
+    if qs:
+        for p in qs:
+            Follow.follow_person(profile=profile, person=p)
+
+def create_follow_liste(profile):
+    qs = profile.follow_lists.all()
+    if qs:
+        for l in qs:
+            Follow.follow_liste(profile=profile, liste=l)
+
+def create_follow_topics(profile):
+    qs = profile.follow_topics.all()
+    if qs:
+        for t in qs:
+            Follow.follow_topic(profile=profile, topic=t)
+
+
+
+def fobj():
+    from tqdm import tqdm
+    plist = Profile.objects.all()
+    for pro in tqdm(plist):
+        create_follow_person(pro)
+        create_follow_liste(pro)
+        create_follow_topics(pro)
+
+def add_type():
+    for f in Follow.objects.all():
+        if f.target_profile:
+            target =  "u"
+        elif f.person:
+            target = "p"
+        elif f.liste:
+            target = "l"
+        elif f.topic:
+            target = "t"
+        f.typeof = target
+        f.save()

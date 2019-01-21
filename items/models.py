@@ -1,5 +1,6 @@
 from django.db import models
-from persons.models import Person, Profile
+from persons.models import Person
+from persons.profile import Profile
 from django.urls import reverse
 from django_mysql.models import (JSONField, SetTextField, ListTextField, SetCharField)
 from django.utils.functional import cached_property

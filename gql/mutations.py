@@ -1,9 +1,10 @@
 
 from items.models import Movie, List, MovieImage, Video, Rating, Topic, Article
-from persons.models import Director, Person, Profile, PersonImage
+from persons.models import Director, Person, PersonImage
+from persons.profile import Profile
+
 from django.contrib.auth import get_user_model
 from django_mysql.models import JSONField
-
 from graphene_django.types import DjangoObjectType
 from graphene_django.converter import convert_django_field
 
@@ -18,6 +19,11 @@ from .types import (VideoType, MovieType, ProfileType, PersonType,
 def convert_json_field_to_string(field, registry=None):
     return graphene.String()
 
+def string_to_date(text):
+    from datetime import date
+    elements = text.strip().split("-")
+    print(elements)
+    return date(int(elements[0]), int(elements[1]), int(elements[2]))
 
 class CreateUser(graphene.Mutation):
     user = graphene.Field(UserType)
@@ -53,6 +59,29 @@ class Bookmark(graphene.Mutation):
             profile.bookmarking(movie)
             return Bookmark(user=user, movie=movie)
 
+class Fav(graphene.Mutation):
+    user = graphene.Field(UserType)
+    video = graphene.Field(VideoType)
+    movie = graphene.Field(MovieType)
+
+
+    class Arguments:
+        id = graphene.Int()
+        type = graphene.String()
+    def mutate(self,info,id, type):
+        if info.context.user.is_authenticated:
+            user = info.context.user
+            profile = user.profile
+            if type.lower().startswith("v"):
+                video = Video.objects.get(id=id)
+                profile.fav(video, type="video")
+                return Fav(user=user, video=video)
+
+            elif type.lower().startswith("m"):
+                movie = Movie.objects.get(id=id)
+                profile.fav(movie, type="movie")
+                return Fav(user=user, movie=movie)
+
 class Follow(graphene.Mutation):
     user = graphene.Field(UserType)
     person = graphene.Field(PersonType)
@@ -64,20 +93,30 @@ class Follow(graphene.Mutation):
         obj = graphene.String()
     def mutate(self,info,id, obj):
         if info.context.user.is_authenticated:
+            print("auth")
             user = info.context.user
             profile = user.profile
             if obj.startswith("p"):
                 person = Person.objects.get(id=id)
                 profile.follow_person(person)
                 return Follow(user=user, person=person)
+
+            elif obj.startswith("d"):
+                person = Person.objects.get(id=id)
+                profile.follow_person(person)
+                return Follow(user=user, person=person)
+
             elif obj.startswith("l"):
                 liste = List.objects.get(id=int(id))
                 profile.follow_list(liste)
                 return Follow(user=user, liste=liste)
+
             elif obj.startswith("t"):
                 topic = Topic.objects.get(id=int(id))
                 profile.follow_topic(topic)
                 return Follow(user=user, topic=topic)
+        else:
+            print("not auth")
             
             
 
@@ -88,7 +127,7 @@ class Rating(graphene.Mutation):
     class Arguments:
         id = graphene.Int()
         rate = graphene.Float()
-        date = graphene.types.datetime.Date(required=False)
+        date = graphene.String(required=False)
         notes = graphene.String(required=False)
 
     def mutate(self,info,id, rate, date=None, notes=None):
@@ -96,7 +135,9 @@ class Rating(graphene.Mutation):
             user = info.context.user
             profile = user.profile
             movie = Movie.objects.get(id=id)
-            profile.rate(movie, rate, notes=notes, date=date )
+            if date:
+                profile.rate(movie, rate, notes=notes, date=string_to_date(date))
+            profile.rate(movie, rate, notes=notes)
             rating = profile.rates.get(movie=movie)
             return Rating(user=user, movie=movie, rating=rating)
 

@@ -1,6 +1,6 @@
 from items.models import Rating,Movie, List, MovieImage, Video, Topic
-from persons.models import Person, Profile, PersonImage, Director, Crew
-        
+from persons.models import Person, PersonImage, Director, Crew
+from persons.profile import Profile, Follow
 from django.contrib.auth import get_user_model
 
 import graphene
@@ -14,11 +14,19 @@ def convert_json_field_to_string(field, registry=None):
 
 class VideoType(DjangoObjectType):
     tags = graphene.List(graphene.String)
+    isFaved = graphene.Boolean()
     #tags = graphene.types.json.JSONString()
     class Meta:
         model=Video
     def resolve_tags(self, info, *_):
         return [x for x in self.tags]
+
+    def resolve_isFaved(self,info, *_):
+        if info.context.user.is_authenticated:
+            user= info.context.user
+            if self in user.profile.videos.all():
+                return True
+        return False
 
 class MovieImageType(DjangoObjectType):
     info = graphene.types.json.JSONString()
@@ -52,6 +60,7 @@ class MovieType(DjangoObjectType):
     viewer_points = graphene.Int()
     viewer_notes = graphene.String()
     viewer_rating_date = graphene.types.datetime.Date()
+    isFaved = graphene.Boolean()
 
 
     class Meta:
@@ -90,8 +99,8 @@ class MovieType(DjangoObjectType):
 
     def resolve_isBookmarked(self,info, *_):
         if info.context.user.is_authenticated:
-            user= info.context.user
-            if self in user.profile.bookmarks.all():
+            user = info.context.user
+            if user.profile in self.bookmarked.all():
                 return True
         return False
 
@@ -108,17 +117,22 @@ class MovieType(DjangoObjectType):
         new_data["Runtime"] = data.get("Runtime")
         return new_data
 
-
     def resolve_tags(self, info, *_):
         return self.tags
 
+    def resolve_isFaved(self,info, *_):
+        if info.context.user.is_authenticated:
+            user= info.context.user
+            if user.profile in self.liked.all():
+                return True
+        return False
 
 class RatingType(DjangoObjectType):
     class Meta:
         model= Rating
 
 
-class ProfileType(DjangoObjectType):
+class ProfileType2(DjangoObjectType):
     token = graphene.String()
     ratings = graphene.types.json.JSONString()
     len_bookmarks = graphene.Int()
@@ -155,9 +169,12 @@ class PersonType(DjangoObjectType):
     def resolve_isFollowed(self, info, *_):
         if info.context.user.is_authenticated:
             profile = info.context.user.profile
-            if profile in self.followers.all():
+            qs = self.followers.select_related("profile")
+            qs_profiles = [x.profile for x in qs]
+            if profile in qs_profiles:
                 return True
         return False
+
     def resolve_data(self,info,*_):
         return self.data
     def resolve_images(self,info, *_):
@@ -170,6 +187,7 @@ class PersonType(DjangoObjectType):
     def resolve_movies(self, info, *_):
         crew_qs = Crew.objects.filter(person=self).select_related("movie").defer("job","character")
         return list(set([x.movie for x in crew_qs]))
+
 class CrewType(DjangoObjectType):
     person = graphene.Field(PersonType)
     class Meta:
@@ -185,6 +203,8 @@ class DirectorType(DjangoObjectType):
     images = graphene.List(PersonImageType) #for property types
     isFollowed = graphene.Boolean()
     lenMovies = graphene.Int()
+    viewer_points = graphene.Int()
+
 
     class Meta:
         model = Person
@@ -194,9 +214,12 @@ class DirectorType(DjangoObjectType):
     def resolve_isFollowed(self, info, *_):
         if info.context.user.is_authenticated:
             profile = info.context.user.profile
-            if profile in self.followers.all():
+            qs = self.followers.select_related("profile")
+            qs_profiles = [x.profile for x in qs]
+            if profile in qs_profiles:
                 return True
         return False
+
     def resolve_data(self,info,*_):
         return self.data
     def resolve_images(self,info, *_):
@@ -204,7 +227,11 @@ class DirectorType(DjangoObjectType):
     def resolve_poster(self, info, *_):
         if self.poster:
             return self.poster.url
-        
+    def resolve_viewer_points(self, info, *_):
+        if info.context.user.is_authenticated:
+            profile= info.context.user.profile
+            return len(profile.ratings.items())
+        return 0
 
 class UserType(DjangoObjectType):
     class Meta:
@@ -215,6 +242,8 @@ class UserType(DjangoObjectType):
 class ListType(DjangoObjectType):
     image = graphene.types.json.JSONString()
     isFollowed = graphene.Boolean()
+    viewer_points = graphene.Int()
+
     class Meta:
         model=List
 
@@ -224,13 +253,23 @@ class ListType(DjangoObjectType):
     def resolve_isFollowed(self, info, *_):
         if info.context.user.is_authenticated:
             profile = info.context.user.profile
-            if profile in self.followers.all():
+            qs = self.followers.select_related("profile")
+            qs_profiles = [x.profile for x in qs]
+            if profile in qs_profiles:
                 return True
         return False
+
+    def resolve_viewer_points(self, info, *_):
+        if info.context.user.is_authenticated:
+            profile= info.context.user.profile
+            return len(profile.ratings.items())
+        return 0
+
 
 class TopicType(DjangoObjectType):
     poster = graphene.String()
     isFollowed = graphene.Boolean()
+    viewer_points = graphene.Int()
     class Meta:
         model = Topic
     def resolve_poster(self, info, *_):
@@ -240,6 +279,60 @@ class TopicType(DjangoObjectType):
     def resolve_isFollowed(self, info, *_):
         if info.context.user.is_authenticated:
             profile = info.context.user.profile
-            if profile in self.followers.all():
+            qs = self.followers.select_related("profile")
+            qs_profiles = [x.profile for x in qs]
+            if profile in qs_profiles:
                 return True
         return False
+
+    def resolve_viewer_points(self, info, *_):
+        if info.context.user.is_authenticated:
+            profile= info.context.user.profile
+            return len(profile.ratings.items())
+        return 0
+
+class ProfileType(DjangoObjectType):
+    token = graphene.String()
+    points = graphene.Int()
+    num_bookmarks = graphene.Int()
+    rates = graphene.Field(RatingType)
+
+    favourite_movies = graphene.List(MovieType)
+    favourite_lists = graphene.List(ListType)
+    favourite_topics = graphene.List(TopicType)
+    favourite_persons =  graphene.List(PersonType)
+
+    class Meta:
+        model = Profile
+    def resolve_rates(self, info, *_):
+        return self.rates.all()
+
+    def resolve_points(self, info):
+        return len(self.ratings.items())
+
+    def resolve_num_bookmarks(self, info):
+        return len(self.ratings.items())
+
+    def resolve_favourite_movies(self, info, *_):
+        qs = Rating.objects.filter(profile=self).select_related("movie").order_by("-rating").defer("notes","date","created_at","updated_at")
+        return  [x.movie for x in qs[:10]]
+
+
+    def resolve_favourite_lists(self, info, *_):
+        qs = Follow.objects.select_related("liste").filter(profile=self,
+             typeof="l").defer("target_profile","person","topic",
+             "updated_at","updated_at")
+        return [x.liste for x in qs]
+
+    def resolve_favourite_topics(self, info, *_):
+        qs = Follow.objects.select_related("topic").filter(profile=self,
+             typeof="t").defer("target_profile","person","liste",
+             "updated_at","updated_at")
+        return [x.topic for x in qs]
+
+    def resolve_favourite_persons(self, info, *_):
+        qs = Follow.objects.select_related("person").filter(profile=self,
+             typeof="p").defer("target_profile","topic","liste",
+             "updated_at","updated_at")
+        return [x.person for x in qs]
+            
