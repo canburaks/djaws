@@ -12,6 +12,13 @@ from graphene_django.converter import convert_django_field
 def convert_json_field_to_string(field, registry=None):
     return graphene.String()
 
+
+def is_owner(self, info):
+    user = info.context.user
+    if user.username == self.username:
+        return True
+    return False
+
 class VideoType(DjangoObjectType):
     tags = graphene.List(graphene.String)
     isFaved = graphene.Boolean()
@@ -243,9 +250,15 @@ class ListType(DjangoObjectType):
     image = graphene.types.json.JSONString()
     isFollowed = graphene.Boolean()
     viewer_points = graphene.Int()
+    followers = graphene.List("gql.types.ProfileType")
 
     class Meta:
         model=List
+
+    def resolve_followers(self,info, *_):
+        qs = Follow.objects.select_related("profile").filter(liste=self, 
+            typeof="l").defer("target_profile","person","topic","updated_at","created_at")
+        return [x.profile for x in qs]
 
     def resolve_image(self, info, *_):
         return self.image
@@ -291,21 +304,50 @@ class TopicType(DjangoObjectType):
             return len(profile.ratings.items())
         return 0
 
+
 class ProfileType(DjangoObjectType):
     token = graphene.String()
+    is_self = graphene.Boolean()
+
+    bookmarks = graphene.List(MovieType)
+    ratings = graphene.Field(RatingType)
+    lists = graphene.List(ListType)
+
     points = graphene.Int()
     num_bookmarks = graphene.Int()
-    rates = graphene.Field(RatingType)
+    is_followed = graphene.Boolean()
 
     favourite_movies = graphene.List(MovieType)
-    favourite_lists = graphene.List(ListType)
-    favourite_topics = graphene.List(TopicType)
-    favourite_persons =  graphene.List(PersonType)
+    favourite_videos = graphene.List(VideoType)
+
+    following_lists = graphene.List(ListType)
+    following_topics = graphene.List(TopicType)
+    following_persons =  graphene.List(PersonType)
+    following_profiles =  graphene.List("gql.types.ProfileType")
+
+    followers = graphene.List("gql.types.ProfileType")
 
     class Meta:
         model = Profile
-    def resolve_rates(self, info, *_):
-        return self.rates.all()
+
+
+    def resolve_is_self(self, info, *_):
+        user = info.context.user
+        if user.username == self.username:
+            return True
+        return False
+
+    def resolve_bookmarks(self, info, *_):
+        return self.bookmarks.all().defer("imdb_id","imdb_rating","summary",
+            "tmdb_id","director","data","ratings_dummy","tags","ratings_user")
+
+    def resolve_ratings(self, info, *_):
+        if is_owner(self,info):
+            return self.rates.all()
+        raise("Not owner of rates")
+
+    def resolve_lists(self, info, *_):
+        return self.lists.all().defer("movies", "reference_notes", "related_persons")
 
     def resolve_points(self, info):
         return len(self.ratings.items())
@@ -313,26 +355,59 @@ class ProfileType(DjangoObjectType):
     def resolve_num_bookmarks(self, info):
         return len(self.ratings.items())
 
+    def resolve_is_followed(self, info, *_):
+        if info.context.user.is_authenticated:
+            profile = info.context.user.profile
+            qs = Follow.objects.filter(profile=profile, target_profile=self, typeof="u")
+            if qs:
+                return True
+            return False
+
     def resolve_favourite_movies(self, info, *_):
-        qs = Rating.objects.filter(profile=self).select_related("movie").order_by("-rating").defer("notes","date","created_at","updated_at")
-        return  [x.movie for x in qs[:10]]
+        qs = self.liked_movies.all().defer("imdb_id","imdb_rating","summary",
+                "tmdb_id","director","data","ratings_dummy", "tags", "ratings_user")
+        return  qs
+
+    def resolve_favourite_videos(self, info, *_):
+        qs = self.videos.defer("duration","channel_url","channel_name",
+                "related_persons","related_movies","related_topics","tags").all()
+        return  qs
 
 
-    def resolve_favourite_lists(self, info, *_):
+    def resolve_following_lists(self, info, *_):
         qs = Follow.objects.select_related("liste").filter(profile=self,
-             typeof="l").defer("target_profile","person","topic",
-             "updated_at","updated_at")
+             typeof="l").defer("target_profile","person","topic","liste__movies",
+             "updated_at","created_at")
         return [x.liste for x in qs]
 
-    def resolve_favourite_topics(self, info, *_):
+    def resolve_following_topics(self, info, *_):
         qs = Follow.objects.select_related("topic").filter(profile=self,
              typeof="t").defer("target_profile","person","liste",
-             "updated_at","updated_at")
+             "updated_at","created_at")
         return [x.topic for x in qs]
 
-    def resolve_favourite_persons(self, info, *_):
+    def resolve_following_persons(self, info, *_):
         qs = Follow.objects.select_related("person").filter(profile=self,
              typeof="p").defer("target_profile","topic","liste",
-             "updated_at","updated_at")
+             "updated_at","created_at")
         return [x.person for x in qs]
             
+    def resolve_following_profiles(self, info, *_):
+        qs = Follow.objects.select_related("target_profile").filter(profile=self,
+             typeof="u").defer("person","topic","liste","updated_at","created_at")
+        return [x.target_profile for x in qs]
+
+
+
+    def resolve_followers(self, info, *_):
+        qs = Follow.objects.select_related("profile").filter(target_profile=self,
+            typeof="u").defer("person","topic","liste","updated_at","created_at")
+        return [x.profile for x in qs]
+"""
+
+class FollowType(DjangoObjectType):
+     =  graphene.List(PersonType)
+
+    class Meta:
+        model = Follow
+"""

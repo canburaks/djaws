@@ -15,6 +15,7 @@ def movie_poster_upload_path(instance, filename):
 def topic_image_upload_path(instance, filename):
     return "topics/{0}/{1}".format(instance.name, filename)
 
+
 class Movie(models.Model):
     id = models.IntegerField(primary_key=True)
     imdb_id = models.CharField(max_length=9, null=True)
@@ -163,8 +164,7 @@ class Movie(models.Model):
             if crew:
                 self.data.update({"crew":crew})
             self.save()
-            
-                
+
 
 class MovieImage(models.Model):
     movie = models.ForeignKey(Movie, related_name='images', on_delete=models.CASCADE)
@@ -179,15 +179,26 @@ class MovieImage(models.Model):
 
 class List(models.Model):
     id = models.IntegerField(primary_key=True)
-    name = models.CharField(max_length=400)
-    summary = models.TextField(max_length=1000,null=True)
+    name = models.CharField(max_length=100)
+    summary = models.TextField(max_length=1000,null=True, blank=True)
     #tags = JSONField(default=dict,blank=True, null=True)
-    movies = models.ManyToManyField(Movie, related_name="lists")
-    priority =  ListTextField(default = list(),base_field=models.IntegerField(),
-                    max_length=150, null=True, blank=True, help_text="Add movie ids in order. Movies will display in this order. ")
+    movies = models.ManyToManyField(Movie,null=True, blank=True, related_name="lists")
+
+    owner = models.ForeignKey(Profile, related_name='lists', on_delete=models.DO_NOTHING)
+    public = models.BooleanField(default=True)
+
+    related_persons = models.ManyToManyField(Person, null=True, blank=True,  related_name="related_lists")
+    reference_notes = models.CharField(max_length=400, null=True, blank=True, help_text="Notes about reference.")
+    reference_link = models.URLField(null=True, blank=True, help_text="Reference of relation with person. Enter link of url")
+
+
     def __str__(self):
         return self.name
     
+    @classmethod
+    def autokey(cls):
+        return cls.objects.all().order_by("-id")[0].id + 1
+
     @staticmethod
     def autocomplete_search_fields():
         return ("id__iexact", "name__icontains",)
@@ -203,6 +214,9 @@ class List(models.Model):
         poster_urls = ["{}{}".format(aws,i["poster"]) for i in posters][:10]
         dictionary = {"id":self.id, "name":self.name, "summary":self.summary, "thumbs":poster_urls}
         return dictionary
+
+
+"""
     @property
     def items(self):
         aws = settings.MEDIA_URL
@@ -210,6 +224,7 @@ class List(models.Model):
                 "tmdb_id","actors","data","ratings_dummy","director","summary","tags","ratings_user")
         movie_dictionary = [{"name":i["name"], "id":i["id"], "poster":"{}{}".format(aws,i["poster"])} for i in movies]
         return movies
+"""
 
 class Topic(models.Model):
     id = models.IntegerField(primary_key=True)

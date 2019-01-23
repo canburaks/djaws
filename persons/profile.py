@@ -15,9 +15,11 @@ class Profile(models.Model):
 
     user = models.OneToOneField(settings.AUTH_USER_MODEL,
         verbose_name=("user"),on_delete=models.CASCADE)
-    username = models.CharField(max_length=40, null=True)
+    username = models.CharField(max_length=40, null=True, unique=True)
+    bio = models.CharField(max_length=60, null=True, blank=True)
+
     name = models.CharField(max_length=40, null=True, blank=True)
-    email = models.EmailField(max_length=254, null=True)
+    email = models.EmailField(max_length=50, null=True)
     joined = models.DateField(null=True, blank=True)
     born = models.DateField(null=True, blank=True)
     is_premium = models.BooleanField(default=False)

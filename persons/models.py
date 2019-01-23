@@ -4,7 +4,7 @@ from django.contrib.auth.models import User
 from django.db.models.signals import post_save
 from django_mysql.models import JSONField
 from django.core.cache import cache
-from .profile import Profile
+from .profile import Profile, Follow
 JOB = (
     ('d', 'Director'),
     ('a', 'Actor/Actress'),

@@ -9,7 +9,6 @@ class Migration(migrations.Migration):
     dependencies = [
         ('items', '0058_auto_20181125_2004'),
     ]
-
     operations = [
         migrations.AlterField(
             model_name='rating',

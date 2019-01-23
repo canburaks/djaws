@@ -39,7 +39,6 @@ class ListQuery(object):
             first=graphene.Int(default_value=None),
             skip=graphene.Int(default_value=None))
 
-
     list_of_lists = graphene.List(ListType,
             first=graphene.Int(default_value=None),
             skip=graphene.Int(default_value=None))
@@ -48,7 +47,7 @@ class ListQuery(object):
             first=graphene.Int(default_value=None),
             skip=graphene.Int(default_value=None))
 
-    liste = graphene.List(MovieType, 
+    list_of_movies = graphene.List(MovieType, 
             id=graphene.Int(default_value=None),
             name=graphene.String(default_value=None),
             search=graphene.String(default_value=None),
@@ -63,7 +62,6 @@ class ListQuery(object):
         id=graphene.Int(default_value=None),
         name=graphene.String(default_value=None),
         search=graphene.String(default_value=None))
-
 
     def resolve_list_of_crew(self, info, **kwargs):
         movie_id = kwargs.get("movie_id")
@@ -123,7 +121,7 @@ class ListQuery(object):
             return paginate(qs, first, skip)
         return qs
 
-    def resolve_liste(self, info, **kwargs):
+    def resolve_list_of_movies(self, info, **kwargs):
         id = kwargs.get("id")
         first = kwargs.get("first")
         skip = kwargs.get("skip")
@@ -349,8 +347,14 @@ class Query(ListQuery, graphene.ObjectType):
 
 
 from .mutations import CreateUser, Bookmark, Follow, Rating, ObtainJSONWebToken, Logout, DummyMutation, RedisMutation, Fav
+from .profile_mutations import CreateList, DeleteList, AddMovie, RemoveMovie
+
 
 class Mutation(graphene.ObjectType):
+    add_movie = AddMovie.Field()
+    remove_movie = RemoveMovie.Field()
+    create_list = CreateList.Field()
+    delete_list = DeleteList.Field()
     #redis = RedisMutation.Field()
     dummy = DummyMutation.Field()
     follow= Follow.Field()

@@ -25,26 +25,6 @@ def string_to_date(text):
     print(elements)
     return date(int(elements[0]), int(elements[1]), int(elements[2]))
 
-class CreateUser(graphene.Mutation):
-    user = graphene.Field(UserType)
-    profile = graphene.Field(ProfileType)
-    class Arguments:
-        username = graphene.String(required=True)
-        password = graphene.String(required=True)
-        email = graphene.String(required=True)
-
-
-    def mutate(self, info, username, password, email):
-        user = get_user_model()(
-            username=username,
-            email=email,
-        )
-        user.set_password(password)
-        user.save()
-        profile = user.profile
-        #token_auth = graphql_jwt.ObtainJSONWebToken.Field()
-        #token = graphql_jwt.shortcuts.get_token(user)
-        return CreateUser(user=user, profile=profile)
 
 class Bookmark(graphene.Mutation):
     user = graphene.Field(UserType)
@@ -84,14 +64,17 @@ class Fav(graphene.Mutation):
 
 class Follow(graphene.Mutation):
     user = graphene.Field(UserType)
+    target_profile = graphene.Field(ProfileType)
     person = graphene.Field(PersonType)
     liste = graphene.Field(ListType)
     topic = graphene.Field(TopicType)
 
     class Arguments:
-        id = graphene.String()
         obj = graphene.String()
-    def mutate(self,info,id, obj):
+        id = graphene.String(required=False)
+        username = graphene.String(required=None)
+
+    def mutate(self,info, obj, id=None, username=None):
         if info.context.user.is_authenticated:
             print("auth")
             user = info.context.user
@@ -115,6 +98,11 @@ class Follow(graphene.Mutation):
                 topic = Topic.objects.get(id=int(id))
                 profile.follow_topic(topic)
                 return Follow(user=user, topic=topic)
+
+            elif obj.startswith("u"):
+                target_profile = Profile.objects.get(username=username)
+                profile.follow_profile(target_profile)
+                return Follow(user=user, target_profile=target_profile)
         else:
             print("not auth")
             
@@ -177,6 +165,28 @@ class Logout(graphene.Mutation):
             logout()
         return Logout(user=user)
 
+class CreateUser(graphene.Mutation):
+    user = graphene.Field(UserType)
+    profile = graphene.Field(ProfileType)
+    class Arguments:
+        username = graphene.String(required=True)
+        password = graphene.String(required=True)
+        email = graphene.String(required=True)
+
+
+    def mutate(self, info, username, password, email):
+        if User.objects.filter(username__iexact=username).exclude(email=email).exists():
+            raise ValidationError('This username has already been taken!')
+        user = get_user_model()(
+            username=username,
+            email=email,
+        )
+        user.set_password(password)
+        user.save()
+        profile = user.profile
+        #token_auth = graphql_jwt.ObtainJSONWebToken.Field()
+        #token = graphql_jwt.shortcuts.get_token(user)
+        return CreateUser(user=user, profile=profile)
 
 
 class ObtainJSONWebToken(graphql_jwt.JSONWebTokenMutation):

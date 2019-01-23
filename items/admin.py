@@ -38,7 +38,7 @@ class MovieAdmin(admin.ModelAdmin):
 # Register your models here.
 @admin.register(List)
 class ListAdmin(admin.ModelAdmin):
-    list_display = ("id",'name',"summary")
+    list_display = ("id",'name',"summary", "owner")
     raw_id_fields = ['movies',]
     autocomplete_lookup_fields = {
         #'fk': ['related_fk'],
