@@ -15,6 +15,11 @@ def movie_poster_upload_path(instance, filename):
 def topic_image_upload_path(instance, filename):
     return "topics/{0}/{1}".format(instance.name, filename)
 
+LIST_RELATION_TYPE = (
+    ('df', "Director's Favourite"),
+    ("fw", "Festival Winner Movies"),
+)
+
 
 class Movie(models.Model):
     id = models.IntegerField(primary_key=True)
@@ -29,15 +34,10 @@ class Movie(models.Model):
     poster = models.ImageField(blank=True, upload_to=movie_poster_upload_path)
     director = models.ForeignKey(Person, on_delete=models.CASCADE, null=True,blank=True, related_name="movies")
 
-    people =  models.ManyToManyField(Person,
-        through='persons.Crew', through_fields=('movie', 'person'),null=True, blank=True)
-
     tags = ListTextField(default = list(),base_field=models.CharField(max_length=20),
                     max_length=20, null=True, blank=True)
     
     data = JSONField(default=dict)
-    ratings_user = SetTextField(default=set(), base_field=models.CharField(max_length=15),null=True, blank=True)
-    ratings_dummy = SetTextField(default=set(), base_field=models.CharField(max_length=15),null=True, blank=True)
     class Meta:
         ordering = ["-year"]
 
@@ -47,6 +47,17 @@ class Movie(models.Model):
     @staticmethod
     def autocomplete_search_fields():
         return ("id__iexact", "name__icontains",)
+
+    @property
+    def archive(self):
+        from archive.models import MovieArchive
+        qs = MovieArchive.objects.get(movie_id= self.id)
+        if qs.exists():
+            return qs[0]
+        else:
+            ma = MovieArchive(movie_id= self.id)
+            ma.save()
+            return ma
 
     @property
     def mini_data(self):
@@ -178,16 +189,20 @@ class MovieImage(models.Model):
         return {"info":self.info, "url":self.image.url}
 
 class List(models.Model):
+
     id = models.IntegerField(primary_key=True)
     name = models.CharField(max_length=100)
     summary = models.TextField(max_length=1000,null=True, blank=True)
     #tags = JSONField(default=dict,blank=True, null=True)
-    movies = models.ManyToManyField(Movie,null=True, blank=True, related_name="lists")
+    movies = models.ManyToManyField(Movie, related_name="lists")
 
     owner = models.ForeignKey(Profile, related_name='lists', on_delete=models.DO_NOTHING)
     public = models.BooleanField(default=True)
 
-    related_persons = models.ManyToManyField(Person, null=True, blank=True,  related_name="related_lists")
+    related_persons = models.ManyToManyField(Person, related_name="related_lists")
+    list_type = models.CharField(max_length=3, choices=LIST_RELATION_TYPE, null=True, blank=True ,
+                help_text="What is the relation about the list and person? E.g; 'Directors favourite movie list'")
+
     reference_notes = models.CharField(max_length=400, null=True, blank=True, help_text="Notes about reference.")
     reference_link = models.URLField(null=True, blank=True, help_text="Reference of relation with person. Enter link of url")
 
@@ -210,20 +225,21 @@ class List(models.Model):
     @property
     def image(self):
         aws = settings.MEDIA_URL
+        posters = self.movies.order_by("?").values("poster")[:4]
+        poster_urls = ["{}{}".format(aws,i["poster"]) for i in posters]
+        return poster_urls
+
+        
+    def movieset(self):
+        return self.movies.values_list("id", flat=True)
+"""
+    @property
+    def image(self):
+        aws = settings.MEDIA_URL
         posters = self.movies.order_by("?").values("poster")
         poster_urls = ["{}{}".format(aws,i["poster"]) for i in posters][:10]
         dictionary = {"id":self.id, "name":self.name, "summary":self.summary, "thumbs":poster_urls}
         return dictionary
-
-
-"""
-    @property
-    def items(self):
-        aws = settings.MEDIA_URL
-        movies = self.movies.defer("imdb_id",
-                "tmdb_id","actors","data","ratings_dummy","director","summary","tags","ratings_user")
-        movie_dictionary = [{"name":i["name"], "id":i["id"], "poster":"{}{}".format(aws,i["poster"])} for i in movies]
-        return movies
 """
 
 class Topic(models.Model):
@@ -234,9 +250,9 @@ class Topic(models.Model):
     #tags = JSONField(default=dict,blank=True, null=True)
     poster = models.ImageField(blank=True, upload_to=topic_image_upload_path)
     
-    movies = models.ManyToManyField(Movie, null=True, blank=True,  related_name="topics")
-    lists = models.ManyToManyField(List, null=True, blank=True,  related_name="topics")
-    persons = models.ManyToManyField(Person, null=True, blank=True,  related_name="topics")
+    movies = models.ManyToManyField(Movie, related_name="topics")
+    lists = models.ManyToManyField(List, related_name="topics")
+    persons = models.ManyToManyField(Person, related_name="topics")
 
     def __str__(self):
         return self.name

@@ -31,6 +31,7 @@ ALLOWED_HOSTS = ["*",
     'http://127.0.0.1:3000',
     'http://127.0.0.1:8000']
 
+#INTERNAL_IPS = ('127.0.0.1')
 # Application definition
 import datetime
 INSTALLED_APPS = [
@@ -42,6 +43,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    #'debug_toolbar',
     'django.contrib.sites', # new
     'django_mysql',
     "django_extensions",
@@ -51,6 +53,7 @@ INSTALLED_APPS = [
     "persons",
     "algorithm",
     "gql",
+    "archive",
 
     'corsheaders',
     "storages",
@@ -75,6 +78,7 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    #'debug_toolbar.middleware.DebugToolbarMiddleware',
     'graphql_jwt.middleware.JSONWebTokenMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
@@ -219,6 +223,7 @@ USE_L10N = True
 USE_TZ = True
 #########################################################################
 #       S3
+#STATIC_URL = '/static/'
 
 
 AWS_ACCESS_KEY_ID = "AKIAJLH2SIQQYCL4TUPA"
@@ -244,6 +249,7 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'static/media') #for upload files
 LOGIN_REDIRECT_URL = "/"
 LOGOUT_REDIRECT_URL = "/logout/"
 LOGOUT_URL = "/logout/"
+
 """
 LOGIN_URL = "login"
 """

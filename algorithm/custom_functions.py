@@ -12,6 +12,7 @@ def sort_dict(dic, item="value", reverse=True):
 
 def random_sample(population, sample_size):
     import random
+    
     if len(population)>sample_size:
         return random.sample(population, sample_size)
     else:

@@ -12,8 +12,10 @@ class VideoTopicInline(admin.TabularInline):
 
 class ImageMovieInline(admin.TabularInline):
     model = MovieImage
+
 class ListMovieInline(admin.TabularInline):
     model = List.movies.through
+
 class TopicMovieInline(admin.TabularInline):
     model = Topic.movies.through
 
@@ -38,12 +40,18 @@ class MovieAdmin(admin.ModelAdmin):
 # Register your models here.
 @admin.register(List)
 class ListAdmin(admin.ModelAdmin):
-    list_display = ("id",'name',"summary", "owner")
-    raw_id_fields = ['movies',]
+    list_display = ("id",'name', "owner")
+    raw_id_fields = ['movies', "owner", "related_persons"]
+    list_select_related = ('owner',)
+    exclude = ('related_persons',)
+
+
     autocomplete_lookup_fields = {
-        #'fk': ['related_fk'],
-        'm2m': ['movies',],
+        'm2m': ['movies', ],
     }
+
+
+
 @admin.register(Video)
 class VideoAdmin(ImportExportModelAdmin):
     list_display = ("id",'title',"link")
@@ -52,7 +60,7 @@ class VideoAdmin(ImportExportModelAdmin):
     resource_class = VideoResource
 
     autocomplete_lookup_fields = {
-        #'fk': ['related_fk'],
+#        'fk': ['related_fk'],
         'm2m': ['related_persons',"related_movies", "related_topics", ],
     }
 

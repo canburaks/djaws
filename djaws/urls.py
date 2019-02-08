@@ -51,8 +51,17 @@ urlpatterns = [
     re_path(r'^graphql', csrf_exempt(GraphQLView.as_view(graphiql=True))),
     re_path(r'^(?:.*)/?$', TemplateView.as_view(template_name="index.html")),
 ]
+"""
+if settings.DEBUG:
+    import debug_toolbar
+    urlpatterns = [
+        path('__debug__/', include(debug_toolbar.urls)),
 
+        # For django versions before 2.0:
+        # url(r'^__debug__/', include(debug_toolbar.urls)),
 
+    ] + urlpatterns
+"""
 
 """
 urlpatterns = [

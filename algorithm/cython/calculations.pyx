@@ -83,11 +83,11 @@ def final(list userlist):
         top += correlation*(rate - vbar)
         sum_of_correlation += fabs(correlation)
 
-        if sum_of_correlation!=0:
-            return top / sum_of_correlation
-        else:
-            print("final function: top/sum_of_correlation = 0")
-            return 0
+    if sum_of_correlation!=0:
+        return top / sum_of_correlation
+    else:
+        print("final function: top/sum_of_correlation = 0")
+        return 0
 
 def z_final(list userlist):
     cdef list single_user
@@ -103,11 +103,11 @@ def z_final(list userlist):
         top += correlation*(rate - vbar)/vstdev
         sum_of_correlation += fabs(correlation)
 
-        if sum_of_correlation!=0:
-            return top / sum_of_correlation
-        else:
-            print("final function: top/sum_of_correlation = 0")
-            return 0
+    if sum_of_correlation!=0:
+        return top / sum_of_correlation
+    else:
+        print("final function: top/sum_of_correlation = 0")
+        return 0
 
 def acs(list collection):
     cdef tuple user_rates

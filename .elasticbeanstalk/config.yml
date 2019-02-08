@@ -1,6 +1,6 @@
 branch-defaults:
   default:
-    environment: dj-rest-05
+    environment: dra-1-2
 environment-defaults:
   dj-rest-03:
     branch: null

@@ -1,5 +1,6 @@
 from django.contrib import admin
-from .models import Profile, Person, Director,Actor, PersonImage, Crew
+from .models import Person, Director,Actor, PersonImage, Crew
+from .profile import Profile, Follow
 from items.models import Video, Movie
 # Register your models here.
 
@@ -14,7 +15,9 @@ class MoviePersonInline(admin.TabularInline):
 
 @admin.register(Profile)
 class ProfileAdmin(admin.ModelAdmin):
-    list_display = ("user",'username',)
+    list_display = ("user",'username', "id", "user__id")
+    def user__id(self, obj):
+        return obj.user.id
 
 @admin.register(Person)
 class PersonAdmin(admin.ModelAdmin):

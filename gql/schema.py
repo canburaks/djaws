@@ -13,8 +13,9 @@ from django.db.models import Q
 from graphene_django.converter import convert_django_field
 from graphene_django.debug import DjangoDebug
 
-from .types import (VideoType, MovieType,RatingType, ProfileType,ProfileType2, PersonType,
-        DirectorType, TopicType, ListType, UserType, CrewType)
+from .types import (VideoType, MovieType, MovieListType, RatingType, ProfileType,ProfileType2, PersonType,
+        CustomListType, CustomMovieType,
+        DirectorType, TopicType, ListType, UserType, CrewType, movie_defer)
 
 def paginate(query, first, skip):
     return query[int(skip) : int(skip) + int(first)]
@@ -31,15 +32,35 @@ def multi_word_query(*arg):
     if len(arg)==1:
         one_word = ( Q(name__icontains=arg[0]) )
 
+def is_owner(self, info):
+    user = info.context.user
+    if user.username == self.username:
+        return True
+    return False
 
 class ListQuery(object):
+    list_of_movie_search = graphene.List(MovieType,
+                search=graphene.String(default_value=None),
+                first=graphene.Int(default_value=None),
+                skip=graphene.Int(default_value=None))
+
+    list_of_bookmarks = graphene.List(MovieType,
+                username=graphene.String(required=True),
+                first=graphene.Int(default_value=None),
+                skip=graphene.Int(default_value=None))
+
+    list_of_ratings_movie = graphene.List(MovieType,
+                username=graphene.String(required=True),
+                first=graphene.Int(default_value=None),
+                skip=graphene.Int(default_value=None))
+
     list_of_crew = graphene.List(CrewType, movie_id=graphene.Int())
 
     list_of_diary = graphene.List(MovieType,
             first=graphene.Int(default_value=None),
             skip=graphene.Int(default_value=None))
 
-    list_of_lists = graphene.List(ListType,
+    list_of_lists = graphene.List(CustomListType,
             first=graphene.Int(default_value=None),
             skip=graphene.Int(default_value=None))
 
@@ -63,6 +84,68 @@ class ListQuery(object):
         name=graphene.String(default_value=None),
         search=graphene.String(default_value=None))
 
+
+    def resolve_list_of_bookmarks(self, info, **kwargs):
+        first = kwargs.get("first")
+        skip = kwargs.get("skip")
+        username = kwargs.get("username")
+        user = info.context.user
+        if user.is_authenticated:
+            qs = user.profile.bookmarks.defer(*movie_defer).all()
+            if first:
+                return  qs[skip : skip + first]
+            else:
+                return  qs
+
+    def resolve_list_of_ratings_movie(self, info, **kwargs):
+        first = kwargs.get("first")
+        skip = kwargs.get("skip")
+        username = kwargs.get("username")
+        user = info.context.user
+        if user.is_authenticated:
+            qs = Movie.objects.defer(*movie_defer).filter(rates__profile=user.profile)
+            if first:
+                return  qs[skip : skip + first]
+            else:
+                return  qs  
+
+
+    def resolve_list_of_movie_search(self, info, **kwargs):
+        first = kwargs.get("first")
+        skip = kwargs.get("skip")
+        search = kwargs.get("search")
+        if search:
+            words = multi_word_search(search)
+            if len(words)==1:
+                filter = ( Q(name__icontains=words[0]) )
+                if first:
+                    return Movie.objects.defer(*movie_defer).filter(filter)[skip : skip + first]
+                else:
+                    return Movie.objects.defer(*movie_defer).filter(filter)
+            elif len(words)>1:
+                term1 = " ".join(words)
+                filter1 = ( Q(name__icontains=term1))
+                qs1 = Movie.objects.defer(*movie_defer).filter(filter1)
+                result = [x for x in qs1]
+
+
+                filter2 = (Q(name__icontains=words[0]))
+                qs2 = Movie.objects.defer(*movie_defer).filter(filter2)
+
+                for i in range(1, len(words)):
+                    kw = words[i]
+                    qs2 = qs2.filter(Q(name__icontains=kw))
+
+                for mov in qs2:
+                    result.append(mov)
+
+                result = list(set(result))
+                if first:
+                    return result[ skip : skip + first ]
+
+                else:
+                    return result
+    
     def resolve_list_of_crew(self, info, **kwargs):
         movie_id = kwargs.get("movie_id")
         show_jobs = ["d", "a"]
@@ -80,9 +163,7 @@ class ListQuery(object):
             Q1 = Q(notes__isnull=False)
             Q2 = Q(date__isnull=False)
             rates = user.profile.rates.filter(Q1 | Q2)
-            qs = Movie.objects.filter(rates__in=rates).defer("imdb_id",
-                    "tmdb_id","data","ratings_dummy","director","summary",
-                    "tags","ratings_user")
+            qs = Movie.objects.filter(rates__in=rates).defer(*movie_defer)
         if first:
             return paginate(qs, first, skip)
         return qs
@@ -92,7 +173,7 @@ class ListQuery(object):
         skip = kwargs.get("skip")
         user = info.context.user
         if user.is_authenticated:
-            qs =  Rating.objects.filter(profiile__username=user.username)
+            qs =  Rating.objects.select_related("movie", "profile").filter(profile__username=user.username)
             if first:
                 return paginate(qs, first, skip)
             return qs
@@ -106,12 +187,16 @@ class ListQuery(object):
         return qs
 
     def resolve_list_of_lists(self, info, **kwargs):
+        id = kwargs.get("id")
         first = kwargs.get("first")
         skip = kwargs.get("skip")
-        qs = List.objects.all()
+        qs = List.objects.filter(owner__username="admin").only("id").values_list("id", flat=True)
         if first:
-            return paginate(qs, first, skip)
-        return qs
+            qs = qs[skip : skip + first]
+        else:
+            qs = qs
+        return [CustomListType(id=x) for x in qs ]
+
 
     def resolve_list_of_topics(self, info, **kwargs):
         first = kwargs.get("first")
@@ -129,19 +214,17 @@ class ListQuery(object):
         search = kwargs.get("search")
         if id is not None:
             """
-            qs = List.objects.get(id=id).movies.defer("imdb_id",
-                    "tmdb_id","data","ratings_dummy","director","summary",
-                    "tags","ratings_user")
+            qs = List.objects.get(id=id).movies.defer(*movie_defer)
             """
             ls = List.objects.only("movies").get(id=id)
             if first:
                 return Movie.objects.defer("imdb_id","imdb_rating","summary",
-                            "tmdb_id","director","data","ratings_dummy",
-                            "tags","ratings_user").filter(lists=ls)[skip : skip + first]
+                            "tmdb_id","director","data",
+                            "tags").filter(lists=ls)[skip : skip + first]
             else:
                 return  Movie.objects.defer("imdb_id","imdb_rating","summary",
-                            "tmdb_id","director","data","ratings_dummy",
-                            "tags","ratings_user").filter(lists=ls)
+                            "tmdb_id","director","data",
+                            "tags").filter(lists=ls)
 
         if name is not None:
             user = info.context.user
@@ -149,22 +232,22 @@ class ListQuery(object):
                 if name=="ratings":
                     if first:
                         return Movie.objects.defer("imdb_id","imdb_rating",
-                                "tmdb_id","data","ratings_dummy","director","summary",
-                                "tags","ratings_user").filter(rates__in=user.profile.rates.only("movie"))[skip : skip + first]
+                                "tmdb_id","data","director","summary",
+                                "tags").filter(rates__in=user.profile.rates.only("movie"))[skip : skip + first]
                     else:
                         return Movie.objects.defer("imdb_id","imdb_rating",
-                                "tmdb_id","data","ratings_dummy","director","summary",
-                                "tags","ratings_user").filter(rates__in=user.profile.rates.only("movie"))
+                                "tmdb_id","data","director","summary",
+                                "tags").filter(rates__in=user.profile.rates.only("movie"))
 
                 if name=="bookmarks":
                     if first:
                         return  Movie.objects.defer("imdb_id","imdb_rating",
-                                "tmdb_id","data","ratings_dummy","director","summary",
-                                "tags","ratings_user").filter(bookmarked=user.profile)[skip : skip + first]
+                                "tmdb_id","data","director","summary",
+                                "tags").filter(bookmarked=user.profile)[skip : skip + first]
                     else:
                         return  Movie.objects.defer("imdb_id","imdb_rating",
-                                "tmdb_id","data","ratings_dummy","director","summary",
-                                "tags","ratings_user").filter(bookmarked=user.profile)        
+                                "tmdb_id","data","director","summary",
+                                "tags").filter(bookmarked=user.profile)        
 
             else :
                 raise Exception('Authentication credentials were not provided')
@@ -175,21 +258,21 @@ class ListQuery(object):
                 filter = ( Q(name__icontains=words[0]) )
                 if first:
                     return Movie.objects.defer("imdb_id","imdb_rating","tmdb_id","data",
-                        "ratings_dummy","director","summary","tags","ratings_user").filter(filter)[skip : skip + first]
+                    "director","summary","tags").filter(filter)[skip : skip + first]
                 else:
                     return Movie.objects.defer("imdb_id","imdb_rating","tmdb_id","data",
-                        "ratings_dummy","director","summary","tags","ratings_user").filter(filter)
+                    "director","summary","tags").filter(filter)
             elif len(words)>1:
                 term1 = " ".join(words)
                 filter1 = ( Q(name__icontains=term1))
                 qs1 = Movie.objects.defer("imdb_id","imdb_rating","tmdb_id","data",
-                        "ratings_dummy","director","summary","tags","ratings_user").filter(filter1)
+                    "director","summary","tags").filter(filter1)
                 result = [x for x in qs1]
 
 
                 filter2 = (Q(name__icontains=words[0]))
                 qs2 = Movie.objects.defer("imdb_id","imdb_rating","tmdb_id","data",
-                        "ratings_dummy","director","summary","tags","ratings_user").filter(filter2)
+                    "director","summary","tags").filter(filter2)
 
                 for i in range(1, len(words)):
                     kw = words[i]
@@ -204,7 +287,7 @@ class ListQuery(object):
                     if len(word)>4:
                         filter2 = ( Q(name__icontains=word) )
                         qs2 = Movie.objects.defer("imdb_id","imdb_rating","tmdb_id","data",
-                            "ratings_dummy","director","summary","tags","ratings_user").filter(filter2)
+                        ,"director","summary","tags").filter(filter2)
                         for mov in qs2:
                             result.append(mov)
                 """
@@ -252,7 +335,10 @@ class ListQuery(object):
 
 class Query(ListQuery, graphene.ObjectType):
     #debug = graphene.Field(DjangoDebug, name='__debug')
-    
+    liste = graphene.Field(CustomListType, id=graphene.Int(required=True),
+                    first=graphene.Int(default_value=None),
+                    skip=graphene.Int(default_value=None))
+
     rating = graphene.Field(RatingType,id=graphene.Int())
 
     topic = graphene.Field(TopicType,id=graphene.Int())
@@ -261,14 +347,21 @@ class Query(ListQuery, graphene.ObjectType):
 
     person = graphene.Field(PersonType,id=graphene.String(default_value=None))
 
-    viewer = graphene.Field(ProfileType2, username=graphene.String())
+    viewer = graphene.Field(ProfileType)
 
     profile = graphene.Field(ProfileType, username=graphene.String())
     
-    movie = graphene.Field(MovieType,id=graphene.Int(),name=graphene.String())
+    omovie = graphene.Field(MovieType,id=graphene.Int(),name=graphene.String())
+
+    movie = graphene.Field(CustomMovieType,id=graphene.Int())
 
     dummy =  graphene.types.json.JSONString(id=graphene.String())
 
+    def resolve_liste(self, info, **kwargs):
+        id = kwargs.get("id")
+        first = kwargs.get("first")
+        skip = kwargs.get("skip")
+        return CustomListType(id, first=first, skip=skip)
 
     def resolve_profile(self, info, **kwargs):
         username = kwargs.get("username")
@@ -326,31 +419,34 @@ class Query(ListQuery, graphene.ObjectType):
     def resolve_viewer(self, info, **kwargs):
         username = kwargs.get("username")
         user = info.context.user
-        if not user.is_authenticated:
-            raise Exception('Authentication credentials were not provided')
+
         if info.context.user.is_authenticated:
             user = info.context.user
-            if user.username==username:
-                profile = user.profile
-                return profile
-
+            return user.profile
+        else:
+            raise Exception('Authentication credentials were not provided')
 
     def resolve_movie(self, info, **kwargs):
+        id = kwargs.get("id")
+        return CustomMovieType(id=id)
+
+    def resolve_omovie(self, info, **kwargs):
         id = kwargs.get("id")
         name = kwargs.get("name")
 
         if id is not None:
-            return Movie.objects.get(id=id)
+            return Movie.objects.defer(*movie_defer).get(id=id)
 
         if name is not None:
-            return Movie.objects.get(name=name)
+            return Movie.objects.defer(*movie_defer).get(name=name)
 
 
 from .mutations import CreateUser, Bookmark, Follow, Rating, ObtainJSONWebToken, Logout, DummyMutation, RedisMutation, Fav
-from .profile_mutations import CreateList, DeleteList, AddMovie, RemoveMovie
+from .profile_mutations import CreateList, DeleteList, AddMovie, RemoveMovie, ProfileInfo
 
 
 class Mutation(graphene.ObjectType):
+    profile_info_mutation = ProfileInfo.Field()
     add_movie = AddMovie.Field()
     remove_movie = RemoveMovie.Field()
     create_list = CreateList.Field()
