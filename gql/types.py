@@ -28,11 +28,59 @@ movie_defer = ("imdb_id","tmdb_id","data",
 class VideoType(DjangoObjectType):
     tags = graphene.List(graphene.String)
     isFaved = graphene.Boolean()
-    #tags = graphene.types.json.JSONString()
+    thumb = graphene.String()
+    yt_id = graphene.String()
+
+    related_movies = graphene.List("gql.types.CustomMovieType")
+    related_persons = graphene.List("gql.types.DirectorPersonMixType")
+
+
     class Meta:
         model=Video
+
+    def resolve_yt_id(self, info, *_):
+        if self.youtube_id:
+            return self.youtube_id
+        else:
+            url = self.link
+            if "youtube" in url:
+                try:
+                    defer_web = url.split("v=")[1]
+                    yt_id = defer_web.split("&")[0]
+                    return yt_id
+                except:
+                    return None            
+
+    def resolve_related_movies(self, info, *_):
+        from gql.types import CustomMovieType
+        movs = self.related_movies.only("id", "name").all()
+        if movs:
+            custom_movie_list = [CustomMovieType(x.id) for x in movs]
+        else:
+            return []
+
+    def resolve_related_persons(self, info, *_):
+        from gql.types import DirectorPersonMixType
+        return self.related_persons.only("id", "name","poster").all()
+
+    def resolve_thumb(self, info, *_):
+        if self.thumbnail:
+            return self.thumbnail
+        else:
+            url = self.link
+            if "youtube" in url:
+                try:
+                    defer_web = url.split("v=")[1]
+                    yt_id = defer_web.split("&")[0]
+                    v.youtube_id = yt_id
+                    v.thumbnail = "https://img.youtube.com/vi/{}/mqdefault.jpg".format(yt_id)
+                except:
+                    raise("Can not split youtube id from link of video")
+                    return None
+
+
     def resolve_tags(self, info, *_):
-        return [x for x in self.tags]
+        return self.tags
 
     def resolve_isFaved(self,info, *_):
         if info.context.user.is_authenticated:
@@ -176,15 +224,35 @@ class ProfileType2(DjangoObjectType):
 
 
 class PersonType(DjangoObjectType):
+    jobs = graphene.List(graphene.String)
     data = graphene.types.json.JSONString()
     poster = graphene.String()
+    square_poster = graphene.String()
     images = graphene.List(PersonImageType) #for property types
+
+    isActive = graphene.Boolean()
     isFollowed = graphene.Boolean()
     movies = graphene.List(MovieType)
     class Meta:
         model = Person
 
-    
+    def resolve_jobs(self,info,):
+        history=  Crew.objects.filter(person=self).only("job").values_list("job", flat=True).distinct()
+        job_list = []
+        for x in history:
+            if x=="a":
+                job_list.append("ACTOR/ACTRESS")
+            if x=="d":
+                job_list.append("DIRECTOR")
+            elif x=="w":
+                job_list.append("WRITER")
+            elif x=="e":
+                job_list.append("EDITOR")
+        return job_list
+
+    def resolve_isActive(self,info,*_):
+        return self.active
+
     def resolve_isFollowed(self, info, *_):
         if info.context.user.is_authenticated:
             profile = info.context.user.profile
@@ -196,12 +264,17 @@ class PersonType(DjangoObjectType):
 
     def resolve_data(self,info,*_):
         return self.data
+
     def resolve_images(self,info, *_):
         return self.images.all()
 
     def resolve_poster(self, info, *_):
-        if self.poster:
+        if self.poster and hasattr(self.poster, "url"):
             return self.poster.url
+
+    def resolve_square_poster(self, info, *_):
+        if self.square_poster and hasattr(self.square_poster, "url"):
+            return self.square_poster.url
     
     def resolve_movies(self, info, *_):
         crew_qs = Crew.objects.filter(person=self).select_related("movie").defer("job","character")
@@ -215,20 +288,85 @@ class CrewType(DjangoObjectType):
     def resolve_person(self, info, *_):
         return self.person
 
+
 class DirectorType(DjangoObjectType):
     data = graphene.types.json.JSONString()
-    poster = graphene.String()
+    jobs = graphene.List(graphene.String)
+    movies = graphene.List(MovieType)
+    favourite_movies = graphene.List(MovieType)
 
+    poster = graphene.String()
+    square_poster = graphene.String()
+    has_cover = graphene.Boolean()
+    cover_poster = graphene.String()
+
+    isActive = graphene.Boolean()
     images = graphene.List(PersonImageType) #for property types
     isFollowed = graphene.Boolean()
     lenMovies = graphene.Int()
     viewer_points = graphene.Int()
+    
+    #Viewer rated movies for this director
+    viewer_movies = graphene.List(MovieType)
+    #Viewer rated movies for this director's favourite film list
+    viewer_favourite_movies = graphene.List(MovieType)
 
 
     class Meta:
         model = Person
+
+    def resolve_jobs(self,info,):
+        history=  Crew.objects.filter(person=self).only("job").values_list("job", flat=True).distinct()
+        job_list = []
+        for x in history:
+            if x=="d":
+                job_list.append("DIRECTOR")
+            elif x=="w":
+                job_list.append("WRITER")
+            elif x=="e":
+                job_list.append("EDITOR")
+        return job_list
+
+    def resolve_viewer_favourite_movies(self, info, *_):
+        if info.context.user.is_authenticated:
+            profile = info.context.user.profile
+            profile_rated_movies = profile.rated_movie_list()
+
+            qs_list = List.objects.prefetch_related("movies").filter(list_type="df",
+                        related_persons=self, movies__in=profile_rated_movies).only("id","movies", "list_type")
+            movie_list = []
+            for x in qs_list:
+                movie_qs = x.movies.only("id","name","poster","year").all()
+                for m in movie_qs:
+                    movie_list.append(m)
+            return list(set(movie_list))
+
+    def resolve_favourite_movies(self, info, *_):
+        qs_list = List.objects.prefetch_related("movies").filter(list_type="df",
+                    related_persons=self).only("id","movies", "list_type")
+        movie_list = []
+        for x in qs_list:
+            movie_qs = x.movies.only("id","name","poster","year").all()
+            for m in movie_qs:
+                movie_list.append(m)
+        return list(set(movie_list))
+
+    def resolve_viewer_movies(self, info, *_):
+        if info.context.user.is_authenticated:
+            profile = info.context.user.profile
+            profile_rated_movies = profile.rated_movie_list()
+            crew_qs = Crew.objects.filter(person=self, movie__in=profile_rated_movies).select_related("movie").defer("job","character")
+            return [x.movie for x in crew_qs]
+            
+    def resolve_movies(self, info, *_):
+        crew_qs = Crew.objects.filter(person=self).select_related("movie").defer("job","character")
+        return list(set([x.movie for x in crew_qs]))
+
+    def resolve_isActive(self,info,):
+        return self.active
+
     def resolve_lenMovies(self,info,*_):
-        return self.movies.count()
+        return Crew.objects.filter(person=self, job="d").count()
 
     def resolve_isFollowed(self, info, *_):
         if info.context.user.is_authenticated:
@@ -243,9 +381,174 @@ class DirectorType(DjangoObjectType):
         return self.data
     def resolve_images(self,info, *_):
         return self.images.all()
+
     def resolve_poster(self, info, *_):
-        if self.poster:
+        if self.poster and hasattr(self.poster, "url"):
             return self.poster.url
+        return "https://s3.eu-west-2.amazonaws.com/cbs-static/static/images/directors-default.jpg"
+
+    def resolve_square_poster(self, info, *_):
+        if self.square_poster and hasattr(self.square_poster, "url"):
+            return self.square_poster.url
+
+    def resolve_has_cover(self,info):
+        if self.cover_poster and hasattr(self.cover_poster, "url"):
+            return True
+        return False
+
+    def resolve_cover_poster(self, info, *_):
+        if self.cover_poster and hasattr(self.cover_poster, "url"):
+            return self.cover_poster.url
+        return "https://s3.eu-west-2.amazonaws.com/cbs-static/static/images/director-cover-background-default.jpg"
+
+    def resolve_viewer_points(self, info, *_):
+        if info.context.user.is_authenticated:
+            profile= info.context.user.profile
+            return len(profile.ratings.items())
+        return 0
+
+
+
+class DirectorPersonMixType(DjangoObjectType):
+    filtered_data = graphene.types.json.JSONString()
+    social_media = graphene.types.json.JSONString()
+
+    jobs = graphene.List(graphene.String)
+    movies = graphene.List(MovieType)
+    favourite_movies = graphene.List(MovieType)
+
+    poster = graphene.String()
+    square_poster = graphene.String()
+    has_cover = graphene.Boolean()
+    cover_poster = graphene.String()
+
+    isActive = graphene.Boolean()
+    images = graphene.List(PersonImageType) #for property types
+    isFollowed = graphene.Boolean()
+    lenMovies = graphene.Int()
+    viewer_points = graphene.Int()
+    
+    #Viewer rated movies for this director
+    viewer_movies = graphene.List(MovieType)
+    #Viewer rated movies for this director's favourite film list
+    viewer_favourite_movies = graphene.List(MovieType)
+
+
+    class Meta:
+        model = Person
+
+    def resolve_jobs(self,info,):
+        history=  Crew.objects.filter(person=self).only("job").values_list("job", flat=True).distinct()
+        job_list = []
+        for x in history:
+            if x=="d":
+                job_list.append("DIRECTOR")
+            elif x=="w":
+                job_list.append("WRITER")
+            elif x=="e":
+                job_list.append("EDITOR")
+        return job_list
+
+    def resolve_viewer_favourite_movies(self, info, *_):
+        if info.context.user.is_authenticated:
+            profile = info.context.user.profile
+            profile_rated_movies = profile.rated_movie_list()
+
+            qs_list = List.objects.prefetch_related("movies").filter(list_type="df",
+                        related_persons=self, movies__in=profile_rated_movies).only("id","movies", "list_type")
+            movie_list = []
+            for x in qs_list:
+                movie_qs = x.movies.only("id","name","poster","year").all()
+                for m in movie_qs:
+                    movie_list.append(m)
+            return list(set(movie_list))
+
+    def resolve_favourite_movies(self, info, *_):
+        qs_list = List.objects.prefetch_related("movies").filter(list_type="df",
+                    related_persons=self).only("id","movies", "list_type")
+        movie_list = []
+        for x in qs_list:
+            movie_qs = x.movies.only("id","name","poster","year").all()
+            for m in movie_qs:
+                movie_list.append(m)
+        return list(set(movie_list))
+
+    def resolve_viewer_movies(self, info, *_):
+        if info.context.user.is_authenticated:
+            profile = info.context.user.profile
+            profile_rated_movies = profile.rated_movie_list()
+            crew_qs = Crew.objects.filter(person=self, movie__in=profile_rated_movies).select_related("movie").defer("job","character")
+            return [x.movie for x in crew_qs]
+            
+    def resolve_movies(self, info, *_):
+        crew_qs = Crew.objects.filter(person=self).select_related("movie").defer("job","character")
+        return list(set([x.movie for x in crew_qs]))
+
+    def resolve_isActive(self,info,):
+        return self.active
+
+    def resolve_lenMovies(self,info,*_):
+        return Crew.objects.filter(person=self, job="d").count()
+
+    def resolve_isFollowed(self, info, *_):
+        if info.context.user.is_authenticated:
+            profile = info.context.user.profile
+            qs = self.followers.select_related("profile")
+            qs_profiles = [x.profile for x in qs]
+            if profile in qs_profiles:
+                return True
+        return False
+
+    def resolve_filtered_data(self,info,*_):
+        person_data = self.data
+        filtered_data = {}
+        keywords = ["gender", "birthday", "deathday","also_known_as", "place_of_birth"]
+        for kw in keywords:
+            if person_data.get(kw)!="" and person_data.get(kw)!=None:
+                if kw=="also_known_as":
+                    filtered_data[kw] = person_data.get(kw)[:2]
+                else:
+                    filtered_data[kw] = person_data.get(kw)
+        return filtered_data
+
+    def resolve_social_media(self,info,*_):
+        person_data = self.data
+        filtered_data = {"imdb": "https://www.imdb.com/name/{}".format(self.id)}
+        keywords = ["homepage", "instagram_id", "facebook_id", "twitter_id"]
+        for kw in keywords:
+            if person_data.get(kw)!="" and person_data.get(kw)!=None:
+                if kw=="twitter_id":
+                    filtered_data["twitter"] = "https://twitter.com/{}".format(person_data.get(kw))
+                if kw=="instagram_id":
+                    filtered_data["instagram"] = "https://www.instagram.com/{}".format(person_data.get(kw))
+                if kw=="facebook_id":
+                    filtered_data["facebook"] = "https://www.facebook.com/{}".format(person_data.get(kw))
+                if kw=="homepage":
+                    filtered_data["homepage"] = "https://www.facebook.com/{}".format(person_data.get(kw))
+        return filtered_data
+
+    def resolve_images(self,info, *_):
+        return self.images.all()
+
+    def resolve_poster(self, info, *_):
+        if self.poster and hasattr(self.poster, "url"):
+            return self.poster.url
+        return "https://s3.eu-west-2.amazonaws.com/cbs-static/static/images/directors-default.jpg"
+
+    def resolve_square_poster(self, info, *_):
+        if self.square_poster and hasattr(self.square_poster, "url"):
+            return self.square_poster.url
+
+    def resolve_has_cover(self,info):
+        if self.cover_poster and hasattr(self.cover_poster, "url"):
+            return True
+        return False
+
+    def resolve_cover_poster(self, info, *_):
+        if self.cover_poster and hasattr(self.cover_poster, "url"):
+            return self.cover_poster.url
+        return "https://s3.eu-west-2.amazonaws.com/cbs-static/static/images/director-cover-background-default.jpg"
+
     def resolve_viewer_points(self, info, *_):
         if info.context.user.is_authenticated:
             profile= info.context.user.profile

@@ -43,7 +43,7 @@ class ListAdmin(admin.ModelAdmin):
     list_display = ("id",'name', "owner")
     raw_id_fields = ['movies', "owner", "related_persons"]
     list_select_related = ('owner',)
-    exclude = ('related_persons',)
+    #exclude = ('related_persons',)
 
 
     autocomplete_lookup_fields = {

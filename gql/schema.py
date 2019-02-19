@@ -14,7 +14,7 @@ from graphene_django.converter import convert_django_field
 from graphene_django.debug import DjangoDebug
 
 from .types import (VideoType, MovieType, MovieListType, RatingType, ProfileType,ProfileType2, PersonType,
-        CustomListType, CustomMovieType,
+        CustomListType, CustomMovieType, DirectorPersonMixType,
         DirectorType, TopicType, ListType, UserType, CrewType, movie_defer)
 
 def paginate(query, first, skip):
@@ -331,9 +331,135 @@ class ListQuery(object):
             )
             return Movie.objects.filter(filter).count()
 
-    
+class SearchQuery(object):
+    search_movie = graphene.List(MovieType,
+                search=graphene.String(),
+                first=graphene.Int(default_value=None),
+                skip=graphene.Int(default_value=None))
 
-class Query(ListQuery, graphene.ObjectType):
+    search_list = graphene.List(CustomListType,
+                search=graphene.String(),
+                first=graphene.Int(default_value=None),
+                skip=graphene.Int(default_value=None))
+
+    search_director = graphene.List(DirectorType,
+                search=graphene.String(),
+                first=graphene.Int(default_value=None),
+                skip=graphene.Int(default_value=None))
+
+    search_length = graphene.List(graphene.Int,
+                search=graphene.String(),
+                first=graphene.Int(default_value=None),
+                skip=graphene.Int(default_value=None))
+
+    def resolve_search_movie(self, info, **kwargs):
+        first = kwargs.get("first")
+        skip = kwargs.get("skip")
+        search = kwargs.get("search")
+        words = multi_word_search(search)
+        if len(words)==1:
+            filter = ( Q(name__icontains=words[0]) )
+            if first:
+                return Movie.objects.defer(*movie_defer).filter(filter)[skip : skip + first]
+            else:
+                return Movie.objects.defer(*movie_defer).filter(filter)
+        elif len(words)>1:
+            term1 = " ".join(words)
+            filter1 = ( Q(name__icontains=term1))
+            qs1 = Movie.objects.defer(*movie_defer).filter(filter1)
+            result = [x for x in qs1]
+
+
+            filter2 = (Q(name__icontains=words[0]))
+            qs2 = Movie.objects.defer(*movie_defer).filter(filter2)
+
+            for i in range(1, len(words)):
+                kw = words[i]
+                qs2 = qs2.filter(Q(name__icontains=kw))
+
+            for mov in qs2:
+                result.append(mov)
+
+            result = list(set(result))
+            if first:
+                return result[ skip : skip + first ]
+
+            else:
+                return result
+
+    def resolve_search_list(self, info, **kwargs):
+        first = kwargs.get("first")
+        skip = kwargs.get("skip")
+        search = kwargs.get("search")
+        words = multi_word_search(search)
+        if len(words)==1:
+            filter1 = ( Q(name__icontains=words[0]) )
+            if first:
+                qs = List.objects.filter(filter1).only("id", "name")[skip : skip + first]
+                liste_list = [CustomListType(id=x.id) for x in qs]
+                return liste_list
+            else:
+                qs = List.objects.filter(filter1).only("id", "name")
+                liste_list = [CustomListType(id=x.id) for x in qs]
+                return liste_list
+        elif len(words)>1:
+            term1 = " ".join(words)
+            filter2 = ( Q(name__icontains=term1))
+            qs1 = List.objects.only("id","name").filter(filter2)
+            result = [x for x in qs1]
+
+
+            filter3 = (Q(name__icontains=words[0]))
+            qs2 = List.objects.only("id","name").filter(filter3)
+
+            for i in range(1, len(words)):
+                kw = words[i]
+                qs2 = qs2.filter(Q(name__icontains=kw))
+
+            for mov in qs2:
+                result.append(mov)
+
+            result = list(set(result))
+            if first:
+                liste_list = [CustomListType(id=x.id) for x in result]
+                return liste_list[ skip : skip + first ]
+            else:
+                liste_list = [CustomListType(id=x.id) for x in result]
+                return liste_list
+
+    def resolve_search_director(self, info, **kwargs):
+        first = kwargs.get("first")
+        skip = kwargs.get("skip")
+        search = kwargs.get("search")
+        words = multi_word_search(search)
+        if len(words)==1:
+            director_filter = ( Q(name__icontains=words[0]))
+            if first:
+                return Director.objects.defer("bio", "data").filter(director_filter)[skip : skip + first]
+            else:
+                return Director.objects.defer("bio", "data").filter(director_filter)
+
+        elif len(words)>1:
+            term1 = " ".join(words)
+            filter1 = ( Q(name__icontains=term1))
+            qs1 = Director.objects.defer("bio", "data").filter(filter1)
+
+            filter2 = (Q(name__icontains=words[0]))
+            qs2 = Director.objects.defer("bio", "data").filter(filter2)
+
+            for i in range(1, len(words)):
+                kw = words[i]
+                qs2 = qs2.filter(Q(name__icontains=kw))
+
+            result = qs1 | qs2
+            result = list(set(result))
+            if first:
+                return result[ skip : skip + first ]
+            else:
+                return result
+
+
+class Query(ListQuery, SearchQuery, graphene.ObjectType):
     #debug = graphene.Field(DjangoDebug, name='__debug')
     liste = graphene.Field(CustomListType, id=graphene.Int(required=True),
                     first=graphene.Int(default_value=None),
@@ -346,6 +472,11 @@ class Query(ListQuery, graphene.ObjectType):
     prediction = graphene.Float(movieId=graphene.Int(default_value=None), id=graphene.Int(default_value=None))
 
     person = graphene.Field(PersonType,id=graphene.String(default_value=None))
+    
+    director = graphene.Field(DirectorType,id=graphene.String(default_value=None))
+
+    director_person_mix = graphene.Field(DirectorPersonMixType,id=graphene.String(default_value=None))
+
 
     viewer = graphene.Field(ProfileType)
 
@@ -409,6 +540,18 @@ class Query(ListQuery, graphene.ObjectType):
             movie = Movie.objects.get(id=movid)
             result = profile.predict(movie)
             return result
+
+    def resolve_director(self, info, **kwargs):
+        id = kwargs.get("id")
+        name = kwargs.get("name")
+        if id is not None:
+            return Person.objects.get(id=id)
+
+    def resolve_director_person_mix(self, info, **kwargs):
+        id = kwargs.get("id")
+        name = kwargs.get("name")
+        if id is not None:
+            return Person.objects.get(id=id)
 
     def resolve_person(self, info, **kwargs):
         id = kwargs.get("id")

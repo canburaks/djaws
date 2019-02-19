@@ -35,6 +35,10 @@ class Profile(models.Model):
     def __str__(self):
         return self.username
 
+    def rated_movie_list(self):
+        qs = self.rates.select_related("movie").only("movie", "movie_id", "profile").all()
+        ml = [x.movie for x in qs]
+        return ml
     def follow_profile(self, target_profile):
         Follow.follow_profile(profile=self, target_profile=target_profile)
 

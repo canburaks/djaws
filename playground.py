@@ -10,6 +10,26 @@ redis_like_ratings = db_folder + "refined_ratings.pickle"
 person_file = db_folder + "person.pickle"
 crew_dict = db_folder + "crew.pickle"
 
+
+
+# Video yt_id and thumb save
+def func(start, stop):
+    from tqdm import tqdm
+    vall = Video.objects.all()[start:stop]
+    for v in tqdm(vall):
+        url = v.link
+        if "youtube" in url:
+            try:
+                defer_web = url.split("v=")[1]
+                yt_id = defer_web.split("&")[0]
+                v.youtube_id = yt_id
+                v.thumbnail = "https://img.youtube.com/vi/{}/mqdefault.jpg".format(yt_id)
+                v.save()
+            except:
+                continue
+
+
+
 def get_pickle(file_directory):
     import _pickle as pickle
     with open(file_directory, "rb") as f:
@@ -204,3 +224,57 @@ def add_type():
             target = "t"
         f.typeof = target
         f.save()
+
+
+######
+def user_to_archive():
+    for ua in tqdm(UserArchive.objects.filter(user_type="u").only("user_id","user_type")):
+        p = Profile.objects.get(user__id=ua.user_id)
+        if len(p.ratings.keys())>30:
+            ua.ratings = set(p.ratings.keys())
+
+missing = []
+qs = MovieArchive.objects.all()
+for m in tqdm(qs):
+    if len(m.dummyset)==0:
+        missing.append(m.movie_id)
+
+"""
+    def rate(self,target, rate,**kwargs):
+            from items.models import Rating
+            from django.core.cache import cache
+            notes = kwargs.get("notes")
+            date = kwargs.get("date")
+            movid = target.id
+            self.ratings.update({str(movid):float(rate)})
+            target.ratings_user.add(str(self.id))
+            self.save()
+
+            if len(self.ratings.keys())>39 and len(self.ratings.keys())%10==0:
+                self.cache_set(movid)
+
+            r , created = Rating.objects.update_or_create(profile=self, movie=target)
+            r.rating = rate
+            if notes:
+                r.notes = notes
+            r.date = date
+            r.save()
+
+            self.save()
+            target.save()
+            print("Rate Added {} {}".format(r.movie, r.rating))
+
+    def cache_set(self, movid):
+        from items.models import Rating
+        from django.core.cache import cache
+        #Add user cache
+        user_cache_id = str(self.user.id)
+        user_cache = cache.get(user_cache_id)
+        cache.set(user_cache_id, self.ratings, None)
+
+        #Add movie cache
+        movie_cache_id = "m{}".format(movid)
+        movie_cache_list = cache.get(movie_cache_id)
+        movie_cache_list.append(user_cache_id)
+        cache.set(movie_cache_id, list(set(movie_cache_list)), None)
+"""

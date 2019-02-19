@@ -15,7 +15,7 @@ class MoviePersonInline(admin.TabularInline):
 
 @admin.register(Profile)
 class ProfileAdmin(admin.ModelAdmin):
-    list_display = ("user",'username', "id", "user__id")
+    list_display = ("user",'username', "id", "user__id", "joined")
     def user__id(self, obj):
         return obj.user.id
 
@@ -43,6 +43,7 @@ class CrewAdmin(admin.ModelAdmin):
 @admin.register(Director)
 class DirectorAdmin(admin.ModelAdmin):
     list_display = ("id",'name',)
+    list_filter = ('active',)
     inlines = [ImagePersonInline,]
     search_fields = ('name', 'id', )
 

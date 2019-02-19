@@ -19,6 +19,12 @@ def person_image_upload_path(instance, filename):
 
 def person_poster_upload_path(instance, filename):
     return "person/{0}/pictures/{1}".format(instance.id,filename)
+
+def director_square_poster_upload_path(instance, filename):
+    return "person/{0}/pictures/square/{1}".format(instance.id,filename)
+
+def director_cover_poster_upload_path(instance, filename):
+    return "person/{0}/pictures/cover/{1}".format(instance.id,filename)
     
 class Person(models.Model):
 
@@ -26,11 +32,13 @@ class Person(models.Model):
         help_text="Use Imdb Id, if exists. " + 
         "Otherwise use prefix 'pp' with 7 digit number. \n" + 
         "E.g: \n If Imdb Id=nm0000759  than enter 'nm0000759' as Id.\n" + 
-         "Otherwise: enter like 'pp0000001' or 'pp1700001'.(2letter(pp) + 7digit)")
+        "Otherwise: enter like 'pp0000001' or 'pp1700001'.(2letter(pp) + 7digit)")
     tmdb_id = models.IntegerField(null=True, blank=True, db_index=True, unique=True)
     name = models.CharField(max_length=40)
 
     bio = models.CharField(max_length=6000, null=True)
+    short_bio = models.CharField(max_length=1000, null=True)
+
     job = models.CharField(max_length=len(JOB), choices=JOB, null=True, blank=True,)
 
     born = models.DateField(null=True, blank=True)
@@ -38,7 +46,9 @@ class Person(models.Model):
     data = JSONField(blank=True,null=True)# {"job": ["director","writer", etc.]}
     active = models.BooleanField(default=False, help_text="if ready for show on web page make it true")
     poster = models.ImageField(blank=True, upload_to=person_poster_upload_path)
-    
+    square_poster = models.ImageField(blank=True, upload_to=director_square_poster_upload_path)
+    cover_poster = models.ImageField(blank=True, upload_to=director_cover_poster_upload_path)
+
     #relations = models.ManyToManyField("self", blank=True)
 
 

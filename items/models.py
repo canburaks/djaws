@@ -232,15 +232,7 @@ class List(models.Model):
         
     def movieset(self):
         return self.movies.values_list("id", flat=True)
-"""
-    @property
-    def image(self):
-        aws = settings.MEDIA_URL
-        posters = self.movies.order_by("?").values("poster")
-        poster_urls = ["{}{}".format(aws,i["poster"]) for i in posters][:10]
-        dictionary = {"id":self.id, "name":self.name, "summary":self.summary, "thumbs":poster_urls}
-        return dictionary
-"""
+
 
 class Topic(models.Model):
     id = models.IntegerField(primary_key=True)
