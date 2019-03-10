@@ -16,6 +16,7 @@ from graphene_django.debug import DjangoDebug
 from .types import (VideoType, MovieType, MovieListType, RatingType, ProfileType,ProfileType2, PersonType,
         CustomListType, CustomMovieType, DirectorPersonMixType,
         DirectorType, TopicType, ListType, UserType, CrewType, movie_defer)
+from .search import CustomSearchType
 
 def paginate(query, first, skip):
     return query[int(skip) : int(skip) + int(first)]
@@ -61,6 +62,12 @@ class ListQuery(object):
             skip=graphene.Int(default_value=None))
 
     list_of_lists = graphene.List(CustomListType,
+            first=graphene.Int(default_value=None),
+            skip=graphene.Int(default_value=None))
+
+    list_of_categorical_lists= graphene.List(CustomListType,
+            admin=graphene.Boolean(default_value=True), # return only admin created lists or not 
+            list_type=graphene.String(),
             first=graphene.Int(default_value=None),
             skip=graphene.Int(default_value=None))
 
@@ -187,7 +194,6 @@ class ListQuery(object):
         return qs
 
     def resolve_list_of_lists(self, info, **kwargs):
-        id = kwargs.get("id")
         first = kwargs.get("first")
         skip = kwargs.get("skip")
         qs = List.objects.filter(owner__username="admin").only("id").values_list("id", flat=True)
@@ -196,6 +202,30 @@ class ListQuery(object):
         else:
             qs = qs
         return [CustomListType(id=x) for x in qs ]
+
+    def resolve_list_of_categorical_lists(self, info, **kwargs):
+        user = info.context.user
+        if user.is_authenticated:
+            first = kwargs.get("first")
+            skip = kwargs.get("skip")
+            list_type = kwargs.get("list_type")
+            admin = kwargs.get("admin")
+            model_types = ["df", "fw", "gr", "ms"]
+
+            if list_type!=None and (list_type.lower() in model_types):
+                qs = List.objects.filter(list_type=list_type).only("id").values_list("id", flat=True)
+            else:
+                qs = List.objects.filter(list_type__in=model_types).only("id").values_list("id", flat=True)
+
+            if admin==True or admin==None:
+                qs = qs.filter(owner__username="admin")
+            if first:
+                qs = qs[skip : skip + first]
+            else:
+                qs = qs
+            return [CustomListType(id=x) for x in qs ]
+        else:
+            raise Exception('Authentication credentials were not provided')
 
 
     def resolve_list_of_topics(self, info, **kwargs):
@@ -332,6 +362,11 @@ class ListQuery(object):
             return Movie.objects.filter(filter).count()
 
 class SearchQuery(object):
+    search = graphene.Field(CustomSearchType,
+                search=graphene.String(),
+                first=graphene.Int(default_value=None),
+                skip=graphene.Int(default_value=None))
+
     search_movie = graphene.List(MovieType,
                 search=graphene.String(),
                 first=graphene.Int(default_value=None),
@@ -351,6 +386,13 @@ class SearchQuery(object):
                 search=graphene.String(),
                 first=graphene.Int(default_value=None),
                 skip=graphene.Int(default_value=None))
+
+    def resolve_search(self, info, **kwargs):
+        first = kwargs.get("first")
+        skip = kwargs.get("skip")
+        search = kwargs.get("search")
+        return CustomSearchType(search=search, first=first, skip=skip)
+
 
     def resolve_search_movie(self, info, **kwargs):
         first = kwargs.get("first")
@@ -481,7 +523,8 @@ class Query(ListQuery, SearchQuery, graphene.ObjectType):
     viewer = graphene.Field(ProfileType)
 
     profile = graphene.Field(ProfileType, username=graphene.String())
-    
+    #myself = graphene.Field(MyProfileType, username=graphene.String(default_value=None))
+
     omovie = graphene.Field(MovieType,id=graphene.Int(),name=graphene.String())
 
     movie = graphene.Field(CustomMovieType,id=graphene.Int())
@@ -492,7 +535,14 @@ class Query(ListQuery, SearchQuery, graphene.ObjectType):
         id = kwargs.get("id")
         first = kwargs.get("first")
         skip = kwargs.get("skip")
+        if info.context.user.is_authenticated:
+            user = info.context.user
+            return CustomListType(id, first=first, skip=skip, viewer=user.profile)
+
         return CustomListType(id, first=first, skip=skip)
+
+
+
 
     def resolve_profile(self, info, **kwargs):
         username = kwargs.get("username")
@@ -560,9 +610,6 @@ class Query(ListQuery, SearchQuery, graphene.ObjectType):
             return Person.objects.get(id=id)
 
     def resolve_viewer(self, info, **kwargs):
-        username = kwargs.get("username")
-        user = info.context.user
-
         if info.context.user.is_authenticated:
             user = info.context.user
             return user.profile
@@ -571,6 +618,9 @@ class Query(ListQuery, SearchQuery, graphene.ObjectType):
 
     def resolve_movie(self, info, **kwargs):
         id = kwargs.get("id")
+        if info.context.user.is_authenticated:
+            user = info.context.user
+            return CustomMovieType(id=id, viewer=user.profile)
         return CustomMovieType(id=id)
 
     def resolve_omovie(self, info, **kwargs):
@@ -584,12 +634,14 @@ class Query(ListQuery, SearchQuery, graphene.ObjectType):
             return Movie.objects.defer(*movie_defer).get(name=name)
 
 
-from .mutations import CreateUser, Bookmark, Follow, Rating, ObtainJSONWebToken, Logout, DummyMutation, RedisMutation, Fav
-from .profile_mutations import CreateList, DeleteList, AddMovie, RemoveMovie, ProfileInfo
+from .mutations import CreateUser, Bookmark, Follow, Rating, ObtainJSONWebToken, Logout,Prediction, DummyMutation, RedisMutation, Fav
+from .profile_mutations import CreateList, DeleteList, AddMovie, RemoveMovie, ProfileInfo, AddMovies
 
 
 class Mutation(graphene.ObjectType):
+    prediction = Prediction.Field()
     profile_info_mutation = ProfileInfo.Field()
+    add_movies = AddMovies.Field()
     add_movie = AddMovie.Field()
     remove_movie = RemoveMovie.Field()
     create_list = CreateList.Field()

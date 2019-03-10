@@ -6,6 +6,7 @@ import graphene
 from django_mysql.models import JSONField
 from graphene_django.types import DjangoObjectType
 from graphene_django.converter import convert_django_field
+from django.db.models import Q
 
 @convert_django_field.register(JSONField)
 def convert_json_field_to_string(field, registry=None):
@@ -195,9 +196,23 @@ class MovieType(DjangoObjectType):
         return False
 
 class RatingType(DjangoObjectType):
+    movie = graphene.Field(MovieType)
+    date = graphene.types.datetime.Date()
+    notes = graphene.String()
+    rating = graphene.Float()
+
     class Meta:
         model= Rating
 
+    def resolve_movie(self, info):
+        return self.movie
+
+    def resolve_date(self, info, *_):
+        return self.date
+    def resolve_notes(self, info, *_):
+        return self.notes
+    def resolve_rating(self, info, *_):
+        return self.rating
 
 class ProfileType2(DjangoObjectType):
     token = graphene.String()
@@ -271,6 +286,13 @@ class PersonType(DjangoObjectType):
     def resolve_poster(self, info, *_):
         if self.poster and hasattr(self.poster, "url"):
             return self.poster.url
+        else:
+            self.save_poster_from_url()
+            if self.poster and hasattr(self.poster, "url"):
+                return self.poster.url
+            else:
+                return "https://s3.eu-west-2.amazonaws.com/cbs-static/static/images/default.jpg"
+
 
     def resolve_square_poster(self, info, *_):
         if self.square_poster and hasattr(self.square_poster, "url"):
@@ -287,6 +309,7 @@ class CrewType(DjangoObjectType):
     
     def resolve_person(self, info, *_):
         return self.person
+
 
 
 class DirectorType(DjangoObjectType):
@@ -482,7 +505,10 @@ class DirectorPersonMixType(DjangoObjectType):
             
     def resolve_movies(self, info, *_):
         crew_qs = Crew.objects.filter(person=self).select_related("movie").defer("job","character")
-        return list(set([x.movie for x in crew_qs]))
+        crew_movies_list = [x.movie for x in crew_qs]
+        person_movies_qs_list = list(self.movies.all())
+        result = person_movies_qs_list + crew_movies_list
+        return list(set(result))
 
     def resolve_isActive(self,info,):
         return self.active
@@ -530,10 +556,17 @@ class DirectorPersonMixType(DjangoObjectType):
     def resolve_images(self,info, *_):
         return self.images.all()
 
+
+
     def resolve_poster(self, info, *_):
         if self.poster and hasattr(self.poster, "url"):
             return self.poster.url
-        return "https://s3.eu-west-2.amazonaws.com/cbs-static/static/images/directors-default.jpg"
+        else:
+            self.save_poster_from_url()
+            if self.poster and hasattr(self.poster, "url"):
+                return self.poster.url
+            else:
+                return "https://s3.eu-west-2.amazonaws.com/cbs-static/static/images/default.jpg"
 
     def resolve_square_poster(self, info, *_):
         if self.square_poster and hasattr(self.square_poster, "url"):
@@ -567,6 +600,7 @@ class ListType(DjangoObjectType):
     viewer_points = graphene.Int()
     followers = graphene.List("gql.types.ProfileType")
     num_movies = graphene.Int()
+    
 
     class Meta:
         model=List
@@ -623,13 +657,17 @@ class TopicType(DjangoObjectType):
         return 0
 
 
+
 class ProfileType(DjangoObjectType):
     token = graphene.String()
     is_self = graphene.Boolean()
     avatar = graphene.String()
+    country = graphene.String()
 
     bookmarks = graphene.List(MovieType)
-    ratings = graphene.Field(RatingType)
+    ratings = graphene.List(RatingType)
+    diaries = graphene.List(RatingType)
+
     latest_ratings = graphene.List(RatingType)
     ratings_movieset = graphene.List(graphene.Int)
 
@@ -659,6 +697,10 @@ class ProfileType(DjangoObjectType):
     def resolve_latest_ratings(self, info, *_):
         return self.rates.select_related("movie").order_by("updated_at")[:5]
 
+    def resolve_country(self, info, *_):
+        if self.country and hasattr(self.country, "name"):
+            return self.country.name
+
     def resolve_is_self(self, info, *_):
         user = info.context.user
         if user.username == self.username:
@@ -669,9 +711,16 @@ class ProfileType(DjangoObjectType):
         return self.bookmarks.all().defer(*movie_defer)
 
     def resolve_ratings(self, info, *_):
-        if is_owner(self,info):
-            return self.rates.all()
-        raise("Not owner of rates")
+        return self.rates.select_related("movie").all()
+        #return Rating.objects.select.related("movie").filter(profile=self).all()
+        
+
+    def resolve_diaries(self, info, *_):
+        q_filter = Q(date__isnull=False)
+        my_diaries = self.rates.filter(q_filter).select_related("movie").order_by("-date")
+        return my_diaries
+
+
 
     def resolve_ratings_movieset(self, info, *_):
         if is_owner(self,info):
@@ -710,25 +759,25 @@ class ProfileType(DjangoObjectType):
 
     def resolve_following_lists(self, info, *_):
         qs = Follow.objects.select_related("liste").filter(profile=self,
-             typeof="l").defer("target_profile","person","topic","liste__movies",
-             "updated_at","created_at")
+            typeof="l").defer("target_profile","person","topic","liste__movies",
+            "updated_at","created_at")
         return [x.liste for x in qs]
 
     def resolve_following_topics(self, info, *_):
         qs = Follow.objects.select_related("topic").filter(profile=self,
-             typeof="t").defer("target_profile","person","liste",
-             "updated_at","created_at")
+            typeof="t").defer("target_profile","person","liste",
+            "updated_at","created_at")
         return [x.topic for x in qs]
 
     def resolve_following_persons(self, info, *_):
         qs = Follow.objects.select_related("person").filter(profile=self,
-             typeof="p").defer("target_profile","topic","liste",
-             "updated_at","created_at")
+            typeof="p").defer("target_profile","topic","liste",
+            "updated_at","created_at")
         return [x.person for x in qs]
             
     def resolve_following_profiles(self, info, *_):
         qs = Follow.objects.select_related("target_profile").filter(profile=self,
-             typeof="u").defer("person","topic","liste","updated_at","created_at")
+            typeof="u").defer("person","topic","liste","updated_at","created_at")
         return [x.target_profile for x in qs]
 
 
@@ -813,6 +862,7 @@ class CustomListType(graphene.ObjectType):
     id = graphene.Int()
     name = graphene.String()
     summary = graphene.String()
+    list_type = graphene.String()
 
     owner = graphene.Field(ProfileType)
     is_self = graphene.Boolean()
@@ -824,16 +874,27 @@ class CustomListType(graphene.ObjectType):
     image = graphene.List(graphene.String)
 
     followers = graphene.List(ProfileType)
+    viewer = graphene.Field(ProfileType)
+
     isFollowed = graphene.Boolean()
 
     num_followers = graphene.Int()
 
 
-    def __init__(self, id, first=None, skip=None):
+    def __init__(self, id, first=None, skip=None, viewer=None):
         self.id = id
         self.liste = List.objects.only("id").get(id=id)
+        self.viewer = viewer
         self.first = first
         self.skip = skip
+
+    def resolve_list_type(self, info):
+        if self.liste.list_type!=None:
+            return self.liste.list_type
+
+    def resolve_viewer(self, info):
+        if self.viewer:
+            return self.viewer
 
     def resolve_name(self, info, *_):
         return self.liste.name
@@ -890,7 +951,10 @@ class CustomMovieType(graphene.ObjectType):
     name = graphene.String()
     summary = graphene.String()
     year = graphene.Int()
+
     poster = graphene.String()
+    has_cover = graphene.Boolean()
+    cover_poster = graphene.String()
 
 
     data = graphene.types.json.JSONString()
@@ -901,7 +965,7 @@ class CustomMovieType(graphene.ObjectType):
     isBookmarked = graphene.Boolean()
     isFaved = graphene.Boolean()
     #liked = graphene.List(ProfileType)
-
+    viewer = graphene.Field(ProfileType)
     viewer_rating = graphene.Float()
     viewer_points = graphene.Int()
     viewer_notes = graphene.String()
@@ -909,10 +973,10 @@ class CustomMovieType(graphene.ObjectType):
     appears = graphene.List(ListType)
 
 
-    def __init__(self, id):
+    def __init__(self, id, viewer=None):
         self.id = id
         self.movie = Movie.objects.only("id").get(id=id)
-
+        self.viewer = viewer #Profile
 
     def resolve_name(self,info):
         return self.movie.name
@@ -926,7 +990,22 @@ class CustomMovieType(graphene.ObjectType):
     def resolve_poster(self,info):
         if self.movie.poster!="" and self.movie.poster!=None:
             return self.movie.poster.url
-        return ""
+        else:
+            return "https://s3.eu-west-2.amazonaws.com/cbs-static/static/images/default.jpg"
+        #else:
+        #    self.movie.save_poster_from_url()
+        #    if self.movie.poster!="" and self.movie.poster!=None:
+        #        return self.movie.poster.url
+        #    return "https://s3.eu-west-2.amazonaws.com/cbs-static/static/images/default.jpg"
+
+    def resolve_has_cover(self,info):
+        if self.movie.cover_poster and hasattr(self.movie.cover_poster, "url"):
+            return True
+        return False
+
+    def resolve_cover_poster(self, info, *_):
+        if self.movie.cover_poster and hasattr(self.movie.cover_poster, "url"):
+            return self.movie.cover_poster.url
 
     def resolve_data(self,info,*_):
         data = self.movie.data
@@ -936,15 +1015,17 @@ class CustomMovieType(graphene.ObjectType):
         new_data["country"] = data.get("Country")
         new_data["runtime"] = data.get("Runtime")
         new_data["website"] = data.get("Website")
-        new_data["imdb_rating"] = str(self.movie.imdb_rating)
         new_data["imdb_id"] = self.movie.imdb_id
         new_data["tmdb_id"] = self.movie.tmdb_id
+        if self.movie.imdb_rating:
+            new_data["imdb_rating"] = str(self.movie.imdb_rating)
 
         return {k:v for k,v in new_data.items() if v!=None}
 
 
     def resolve_videos(self, info):
         qs = self.movie.videos.all()
+        return qs
 
 
     def resolve_director(self, info):
@@ -957,13 +1038,17 @@ class CustomMovieType(graphene.ObjectType):
                 if Person.objects.filter(name=self.movie.data.get("Director"), job="d").count()==1:
                     return Person.objects.filter(name=self.movie.data.get("Director"), job="d")
         else:
-            return None
+            return []
 
 
     def resolve_crew(self, info):
-        qs = Crew.objects.filter(movie=self.movie, job__in=["a"])
-        return qs
-
+        qs = Crew.objects.filter(movie=self.movie, job__in=["a","d"])
+        qs_list = list(qs)
+        if not qs.filter(job="d").exists():
+            if self.movie.director:
+                if Crew.objects.filter(person=self.movie.director, job="d").exists():
+                    qs_list.append( Crew.objects.filter(person=self.movie.director, job="d")[0] )
+        return qs_list
 
     def resolve_isBookmarked(self,info, *_):
         if info.context.user.is_authenticated:
@@ -973,12 +1058,13 @@ class CustomMovieType(graphene.ObjectType):
         return False
 
     def resolve_isFaved(self,info, *_):
-        if info.context.user.is_authenticated:
-            user= info.context.user
-            if user.profile in self.movie.liked.only("id", "username").all():
-                return True
+        if self.viewer and self.viewer in self.movie.liked.only("id", "username").all():
+            return True
         return False
 
+    def resolve_viewer(self, info):
+        if self.viewer:
+            return self.viewer
 
     def resolve_viewer_rating(self, info, *_):
         if info.context.user.is_authenticated:
@@ -991,7 +1077,7 @@ class CustomMovieType(graphene.ObjectType):
             try:
                 return profile.rates.get(movie=self.movie).date
             except:
-                return ""
+                return None
 
     def resolve_viewer_notes(self, info, *_):
         if info.context.user.is_authenticated:
@@ -1011,11 +1097,23 @@ class CustomMovieType(graphene.ObjectType):
         qs = self.movie.lists.filter(list_type="df").defer("movies")
         return qs
 
+
+
+
 """
 
 class FollowType(DjangoObjectType):
-     =  graphene.List(PersonType)
+    =  graphene.List(PersonType)
 
     class Meta:
         model = Follow
+
+def resolve_poster(self, info, *_):
+        if self.poster and hasattr(self.poster, "url"):
+            return self.poster.url
+        else:
+            if self.data.get("tmdb_poster_path"):
+                return self.data.get("tmdb_poster_path")
+            else:
+                return "https://s3.eu-west-2.amazonaws.com/cbs-static/static/images/directors-default.jpg" 
 """

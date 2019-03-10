@@ -3,7 +3,8 @@ from items.models import Movie, List, MovieImage, Video, Rating, Topic, Article
 from persons.models import Director, Person, PersonImage
 from persons.profile import Profile
 
-from django.contrib.auth import get_user_model
+from django.contrib.auth import get_user_model 
+from django.contrib.auth.models import User 
 from django_mysql.models import JSONField
 from graphene_django.types import DjangoObjectType
 from graphene_django.converter import convert_django_field
@@ -25,10 +26,22 @@ def string_to_date(text):
     print(elements)
     return date(int(elements[0]), int(elements[1]), int(elements[2]))
 
+class Prediction(graphene.Mutation):
+    prediction = graphene.Float()
+    class Arguments:
+        id = graphene.Int()
 
-
-
-
+    def mutate(self,info,id):
+        if info.context.user.is_authenticated:
+            profile = info.context.user.profile
+            if len(profile.ratings.items())<30:
+                return Prediction(prediction=0)
+            try:
+                movie = Movie.objects.get(id=id)
+                result = profile.predict(movie)
+                return Prediction(prediction=result)
+            except:
+                return Prediction(prediction=0)
 
 class Bookmark(graphene.Mutation):
     user = graphene.Field(UserType)
@@ -129,7 +142,8 @@ class Rating(graphene.Mutation):
             movie = Movie.objects.get(id=id)
             if date:
                 profile.rate(movie, rate, notes=notes, date=string_to_date(date))
-            profile.rate(movie, rate, notes=notes)
+            else:
+                profile.rate(movie, rate, notes=notes)
             rating = profile.rates.get(movie=movie)
             return Rating(user=user, movie=movie, rating=rating)
 
@@ -185,6 +199,7 @@ class CreateUser(graphene.Mutation):
             username=username,
             email=email,
         )
+
         user.set_password(password)
         user.save()
         profile = user.profile

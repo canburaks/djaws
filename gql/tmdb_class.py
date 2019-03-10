@@ -5,6 +5,7 @@ baseUrl = "https://image.tmdb.org/t/p/w185"# + "poster_path"
 class Movie:
     key = "64fdf8453969abf3a5df3c2eac6c367f"
     poster_base_url = "https://image.tmdb.org/t/p/w185"# + "poster_path"
+    cover_base_url = "https://image.tmdb.org/t/p/w1280"
 
     def __init__(self, tmdb_id):
         self.tmdb_id = tmdb_id
@@ -45,6 +46,46 @@ class Movie:
         istek = requests.get(url)
         response = istek.json()
         return response
+    
+    def social_media_links(self):
+        social_data = {}
+        r = self.external_ids()
+        mediums = ["id", "imdb_id", "facebook_id", "instagram_id", "twitter_id"]
+        for s in mediums:
+            kw = r.get(s)
+            if kw!=None and kw!="":
+                if s=="id":
+                    social_data["tmdb_id"] = kw
+                    social_data["tmdb_link"] = "https://www.themoviedb.org/movie/" + str(kw)
+                elif s=="imdb_id":
+                    social_data["imdb_id"] = kw
+                    social_data["imdb_link"] = "https://www.imdb.com/title/" + str(kw)
+
+                elif s=="facebook_id":
+                    social_data["facebook_id"] = kw
+                    social_data["facebook_link"] = "https://www.facebook.com/" + str(kw)
+
+                elif s=="twitter_id":
+                    social_data["twitter_id"] = kw
+                    social_data["twitter_link"] = "https://twitter.com/" + str(kw)
+
+                elif s=="instagram_id":
+                    social_data["instagram_id"] = kw
+                    social_data["instagram_link"] = "https://www.instagram.com/" + str(kw)
+        return social_data
+
+    def poster_links(self):
+        response = self.details()
+        posters = {}
+        if response.get("poster_path"):
+            posters["tmdb_poster_path"] = self.poster_base_url + response.get("poster_path")
+
+        if response.get("backdrop_path"):
+            posters["tmdb_cover_path"] = self.cover_base_url + response.get("backdrop_path")
+        return posters
+
+
+
 
 
 class Person:
@@ -104,6 +145,41 @@ class Person:
         response = istek.json()
         return response
 
+    def social_media_links(self):
+        social_data = {}
+        r = self.external_ids()
+        mediums = ["id", "imdb_id", "facebook_id", "instagram_id", "twitter_id"]
+        for s in mediums:
+            kw = r.get(s)
+            if kw!=None and kw!="":
+                if s=="id":
+                    social_data["tmdb_id"] = kw
+                    social_data["tmdb_link"] = "https://www.themoviedb.org/movie/" + str(kw)
+
+                elif s=="imdb_id":
+                    social_data["imdb_id"] = kw
+                    social_data["imdb_link"] = "https://www.imdb.com/name/" + str(kw)
+
+                elif s=="facebook_id":
+                    social_data["facebook_id"] = kw
+                    social_data["facebook_link"] = "https://www.facebook.com/" + str(kw)
+
+                elif s=="twitter_id":
+                    social_data["twitter_id"] = kw
+                    social_data["twitter_link"] = "https://twitter.com/" + str(kw)
+
+                elif s=="instagram_id":
+                    social_data["instagram_id"] = kw
+                    social_data["instagram_link"] = "https://www.instagram.com/" + str(kw)
+
+        return social_data
+
+    def poster_links(self):
+        response = self.details()
+        posters = {}
+        if response.get("profile_path"):
+            posters["tmdb_poster_path"] = self.poster_base_url + response.get("profile_path")
+        return posters
 
 class Tv:
     key = "64fdf8453969abf3a5df3c2eac6c367f"

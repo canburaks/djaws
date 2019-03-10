@@ -66,7 +66,6 @@ class CreateList(graphene.Mutation):
         if info.context.user.is_authenticated:
             if List.objects.filter(name=name).exists():
                 raise Exception("Choose another name for the list")
-            print("public", public)
             user = info.context.user
             profile = user.profile
             new_list_id = List.autokey()
@@ -106,6 +105,7 @@ class DeleteList(graphene.Mutation):
             raise Exception("Please Login")
 
 class AddMovie(graphene.Mutation):
+    profile = graphene.Field(ProfileType)
     movie = graphene.Field(MovieType)
     liste = graphene.Field(ListType)
     message= graphene.String()
@@ -121,7 +121,33 @@ class AddMovie(graphene.Mutation):
             if target_list.owner==profile:
                 target_movie = Movie.objects.only("id").get(id=movie_id)
                 target_list.movies.add(target_movie)
-                return AddMovie(movie=target_movie, liste=target_list, message="Movie was added.")
+                return AddMovie(movie=target_movie, liste=target_list,profile=profile, message="Movie was added.")
+            else:
+                raise Exception("You are not the owner of the list")
+        else:
+            raise Exception("Please login again.")
+
+class AddMovies(graphene.Mutation):
+    profile = graphene.Field(ProfileType)
+    liste = graphene.Field(ListType)
+    movies = graphene.List(MovieType)
+
+    message= graphene.String()
+    class Arguments:
+        movie_ids = graphene.List( graphene.Int ,required=True)
+        liste_id = graphene.Int(required=True)
+
+    def mutate(self, info, movie_ids, liste_id):
+        if info.context.user.is_authenticated:
+            user = info.context.user
+            profile = user.profile
+            target_list = List.objects.select_related("owner").only("id","owner", "name").get(id=liste_id)
+            if target_list.owner==profile:
+                target_movies_qs = Movie.objects.filter(id__in=movie_ids).only("id", "name", "year", "poster")
+                for target_movie in target_movies_qs:
+                    target_list.movies.add(target_movie)
+                    
+                return AddMovies(movies=target_movies_qs, liste=target_list, profile=profile, message="Movies was added.")
             else:
                 raise Exception("You are not the owner of the list")
         else:
@@ -129,6 +155,7 @@ class AddMovie(graphene.Mutation):
 
 #Remove single movie
 class RemoveMovie(graphene.Mutation):
+    profile = graphene.Field(ProfileType)
     movie = graphene.Field(MovieType)
     liste = graphene.Field(ListType)
     message= graphene.String()
@@ -144,7 +171,7 @@ class RemoveMovie(graphene.Mutation):
             if target_list.owner==profile:
                 target_movie = Movie.objects.only("id").get(id=movie_id)
                 target_list.movies.remove(target_movie)
-                return RemoveMovie(liste=target_list, message="Movie was removed.")
+                return RemoveMovie(liste=target_list,profile=profile, message="Movie was removed.")
             else:
                 raise Exception("You are not the owner of the list")
         else:
@@ -152,6 +179,7 @@ class RemoveMovie(graphene.Mutation):
 
 #Remove List of movies
 class RemoveMovies(graphene.Mutation):
+    profile = graphene.Field(ProfileType)
     movies = graphene.List(MovieType)
     liste = graphene.Field(ListType)
     message= graphene.String()
@@ -167,7 +195,7 @@ class RemoveMovies(graphene.Mutation):
             if target_list.owner==profile:
                 target_movies = Movie.objects.only("id").filter(id__in=movie_ids)
                 target_list.movies.remove(*target_movies)
-                return RemoveMovie(liste=target_list, message="List of Movies were removed.")
+                return RemoveMovie(liste=target_list,profile=profile, message="List of Movies were removed.")
             else:
                 raise Exception("You are not the owner of the list")
         else:

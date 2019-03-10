@@ -59,7 +59,7 @@ INSTALLED_APPS = [
     "storages",
 
     'import_export',
-
+    "django_countries",
 ]
 
 #CORS_ORIGIN_ALLOW_ALL = True

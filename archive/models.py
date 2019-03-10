@@ -93,6 +93,8 @@ class UserArchive(Model):
     def prediction(self, movie_id, final="mean"):
         target_users = self.target_users(movie_id)
         neighbours = self.neighbours(target_users)
+        if len(neighbours)==0:
+            return -1
         v_ratings = []
         v_bars = []
         v_sims = []
@@ -106,9 +108,12 @@ class UserArchive(Model):
             
             m_score = cc.mean_score(cc.carray(v_ratings),
                     cc.carray(v_bars), cc.carray(v_sims))
-
-            result = self.get_mean() + m_score
-            return result
+            #print("mscore", m_score)
+            if m_score>0.1:
+                result = self.get_mean() + m_score
+                #print("result", result )
+                return result
+            return 0
 
         elif final.startswith("z"):
             for n in neighbours:
@@ -120,20 +125,23 @@ class UserArchive(Model):
             
             z_score = cc.z_score(cc.carray(v_ratings),cc.carray(v_bars),
                     cc.carray(v_sims), cc.carray(v_stdevs))
+            if z_score>0.1:
+                result = self.get_mean() + self.stdev() * z_score
+                return result
+            return 0
 
-            result = self.get_mean() + self.stdev() * z_score
-            return result
 
-
-    def post_prediction(self, movie_id):
-        result = self.prediction(movie_id)
-        print(f"mean 1: {result}")
+    def post_prediction(self, movie_id, final):
+        result = self.prediction(movie_id, final)
+        #print(f"mean 1: {result}")
         final_result = float()
 
         #if unsense result, try z-score normalization
-        if result>4.9 or result<=0.6:
+        if result==-1:
+            return 0
+        elif result>4.9 or result<=0.6:
             z_result =  self.prediction(movie_id, final="z")
-            print(f"z 1: {result}")
+            #print(f"z 1: {result}")
 
             if z_result>4.9 or z_result<=0.6:
                 return 0
