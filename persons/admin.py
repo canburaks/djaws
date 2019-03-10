@@ -32,7 +32,7 @@ class CrewAdmin(admin.ModelAdmin):
     list_display = ('person',"movie",)
     #inlines = [ImagePersonInline,]
     list_display_links = ("person",)
-    search_fields = ('person', 'movie', )
+    search_fields = ('person__name', 'movie__name', )
 
     autocomplete_lookup_fields = {
         'fk': ['movie', "person"],

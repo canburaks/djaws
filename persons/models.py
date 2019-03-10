@@ -58,6 +58,34 @@ class Person(models.Model):
     @staticmethod
     def autocomplete_search_fields():
         return ("id__iexact","tmdb_id__iexact", "name__icontains",)
+    @property
+    def tmdb(self):
+        from gql.tmdb_class import Person as TP
+        if self.tmdb_id:
+            return TP(self.tmdb_id)
+
+
+    def save_poster_from_url(self, force=False):
+        from gql.functions import url_image, get_poster_url
+        if force==False:
+            if self.poster and hasattr(self.poster, "url"):
+                print("Person already have poster")
+                pass
+            else: 
+                if get_poster_url(self):
+                    poster_url = get_poster_url(self)
+                    filename = "{}-poster.jpg".format(self.id)
+                    self.poster.save(*url_image(poster_url, filename))
+                else:
+                    print("poster url could not found")
+        elif force==True:
+            poster_url = get_poster_url(self)
+            if poster_url:
+                filename = "{}-poster.jpg".format(self.id)
+                self.poster.save(*url_image(poster_url, filename))
+                print("poster saved")
+            else:
+                print("poster url could not found")
 
 
 class Crew(models.Model):

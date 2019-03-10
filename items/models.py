@@ -12,12 +12,18 @@ def item_image_upload_path(instance, filename):
 def movie_poster_upload_path(instance, filename):
     return "posters/{0}/{1}".format(instance.id,filename)
 
+def movie_cover_poster_upload_path(instance, filename):
+    return "posters/{0}/cover/{1}".format(instance.id,filename)
+
 def topic_image_upload_path(instance, filename):
     return "topics/{0}/{1}".format(instance.name, filename)
 
 LIST_RELATION_TYPE = (
     ('df', "Director's Favourite"),
     ("fw", "Festival Winner Movies"),
+    ("gr", "Genre Related"),
+    ("ms", "Miscellaneous"),
+
 )
 
 
@@ -31,7 +37,10 @@ class Movie(models.Model):
     summary = models.TextField(max_length=5000,null=True)
 
     imdb_rating = models.DecimalField(max_digits=3, decimal_places=2, blank=True, null=True)
+    
     poster = models.ImageField(blank=True, upload_to=movie_poster_upload_path)
+    cover_poster = models.ImageField(blank=True, upload_to=movie_cover_poster_upload_path)
+
     director = models.ForeignKey(Person, on_delete=models.CASCADE, null=True,blank=True, related_name="movies")
 
     tags = ListTextField(default = list(),base_field=models.CharField(max_length=20),
@@ -78,9 +87,9 @@ class Movie(models.Model):
     def image(self):
         return self.poster.url
 
-    def setOmdbInfo(self):
+    def setOmdbInfo(self, force=False):
         from .outerApi import omdb_details
-        if self.summary:
+        if self.summary and not force:
             return 0
         if self.imdb_id:
             imdbId=self.imdb_id
@@ -176,6 +185,59 @@ class Movie(models.Model):
                 self.data.update({"crew":crew})
             self.save()
 
+    @property
+    def tmdb(self):
+        from gql.tmdb_class import Movie as TM
+        if self.tmdb_id:
+            return TM(self.tmdb_id)
+
+    def save_cover_from_url(self):
+        from gql.functions import url_image
+        cover_url = self.tmdb.poster_links().get("tmdb_cover_path")
+        if cover_url:
+            filename = "{}-cover.jpg".format(self.id)
+            self.cover_poster.save(*url_image(cover_url, filename))
+            print("cover saved")
+        else:
+            print("cover url could not found")
+
+    def save_poster_from_url(self, force=False):
+        from gql.functions import url_image, get_poster_url
+        if force==False:
+            try:
+                if self.poster and hasattr(self.poster, "url"):
+                    print("Person already have poster")
+                    pass
+                else: 
+                    if get_poster_url(self):
+                        poster_url = get_poster_url(self)
+                        filename = "{}-poster.jpg".format(self.id)
+                        self.poster.save(*url_image(poster_url, filename))
+                    else:
+                        print("poster url could not found")
+            except:
+                print("Movie Model poster could not be saved from source ")
+
+
+"""
+    def save_cover_poster(self):
+        from django.core import files
+        from io import BytesIO
+        import requests
+        from gql.functions import url_image
+        cover_link = self.tmdb.poster_links().get("tmdb_cover_path")
+        try:
+            response = requests.get(cover_link)
+            fp = BytesIO()
+            fp.write(response.content)
+
+            filepath = "{0}-cover.jpg".format(self.id)
+            self.cover_poster.save(filepath, files.File(fp))
+            print("Cover poster was saved")
+        except:
+            print("Poster Could not be saved")
+"""
+
 
 class MovieImage(models.Model):
     movie = models.ForeignKey(Movie, related_name='images', on_delete=models.CASCADE)
@@ -199,7 +261,7 @@ class List(models.Model):
     owner = models.ForeignKey(Profile, related_name='lists', on_delete=models.DO_NOTHING)
     public = models.BooleanField(default=True)
 
-    related_persons = models.ManyToManyField(Person, related_name="related_lists")
+    related_persons = models.ManyToManyField(Person, null=True, blank=True, related_name="related_lists")
     list_type = models.CharField(max_length=3, choices=LIST_RELATION_TYPE, null=True, blank=True ,
                 help_text="What is the relation about the list and person? E.g; 'Directors favourite movie list'")
 

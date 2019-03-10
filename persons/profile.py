@@ -3,6 +3,7 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.db.models.signals import post_save
 from django_mysql.models import JSONField
+from django_countries.fields import CountryField
 
 FOLLOW_TYPE = (
     ('u', 'Profile'),
@@ -19,13 +20,16 @@ class Profile(models.Model):
     user = models.OneToOneField(settings.AUTH_USER_MODEL,
         verbose_name=("user"),on_delete=models.CASCADE)
     username = models.CharField(max_length=40, null=True, unique=True)
+    name = models.CharField(max_length=40, null=True, blank=True)
     bio = models.CharField(default="...", max_length=140, null=True, blank=True)
+    country = CountryField(blank=True, null=True)
     avatar = models.ImageField(blank=True, upload_to=avatar_upload_path)
 
-    name = models.CharField(max_length=40, null=True, blank=True)
     email = models.EmailField(max_length=50, null=True)
     joined = models.DateField(null=True, blank=True)
     born = models.DateField(null=True, blank=True)
+
+
     is_premium = models.BooleanField(default=False)
     ratings = JSONField(default=dict)
     bookmarks = models.ManyToManyField("items.Movie", related_name="bookmarked")
@@ -137,13 +141,16 @@ class Profile(models.Model):
             self.save()
             print("Rate Added {} {}".format(r.movie, r.rating))
 
-    def predict(self, target,zscore=True):
+    def predict(self, target,zscore=False):
         from items.models import Prediction
+        final="mean"
+        if zscore:
+            final="zscore"
         movie_id = target.id
         if movie_id in self.ratings.keys():
             return 0
         ua = self.archive
-        result = ua.post_prediction(movie_id)
+        result = ua.post_prediction(movie_id, final)
         points = self.points
 
         pred = Prediction.objects.create(profile=self, profile_points=points,
