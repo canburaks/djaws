@@ -14,7 +14,7 @@ from graphene_django.converter import convert_django_field
 from graphene_django.debug import DjangoDebug
 
 from .types import (VideoType, MovieType, MovieListType, RatingType, ProfileType,ProfileType2, PersonType,
-        CustomListType, CustomMovieType, DirectorPersonMixType,
+        CustomListType, CustomMovieType, DirectorPersonMixType,CountryType,
         DirectorType, TopicType, ListType, UserType, CrewType, movie_defer)
 from .search import CustomSearchType
 
@@ -531,6 +531,17 @@ class Query(ListQuery, SearchQuery, graphene.ObjectType):
 
     dummy =  graphene.types.json.JSONString(id=graphene.String())
 
+    countries = graphene.List(CountryType)
+
+    def resolve_countries(self,info, **kwargs):
+        num = kwargs.get("num")
+        liste = []
+        for i in range(1,249,1):
+            if CountryType(num=i)!=None:
+                country = CountryType(num=i)
+                liste.append(country)
+        return liste
+
     def resolve_liste(self, info, **kwargs):
         id = kwargs.get("id")
         first = kwargs.get("first")
@@ -635,10 +646,11 @@ class Query(ListQuery, SearchQuery, graphene.ObjectType):
 
 
 from .mutations import CreateUser, Bookmark, Follow, Rating, ObtainJSONWebToken, Logout,Prediction, DummyMutation, RedisMutation, Fav
-from .profile_mutations import CreateList, DeleteList, AddMovie, RemoveMovie, ProfileInfo, AddMovies
+from .profile_mutations import CreateList, DeleteList, AddMovie, RemoveMovie, ProfileInfo, AddMovies, UploadAvatar
 
 
 class Mutation(graphene.ObjectType):
+    upload_avatar = UploadAvatar.Field()
     prediction = Prediction.Field()
     profile_info_mutation = ProfileInfo.Field()
     add_movies = AddMovies.Field()

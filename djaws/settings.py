@@ -57,7 +57,7 @@ INSTALLED_APPS = [
 
     'corsheaders',
     "storages",
-
+    "imagekit",
     'import_export',
     "django_countries",
 ]
@@ -186,9 +186,15 @@ CACHE_OPTIONS=[
             "CLIENT_CLASS": "django_redis.client.DefaultClient",
         }
     }
-}]
+},{
+    'default': {
+        'BACKEND': 'django.core.cache.backends.filebased.FileBasedCache',
+        'LOCATION': BASE_DIR + 'static/media/CACHE',
+    }
+}
+]
 
-CACHES = CACHE_OPTIONS[1] # 0=>ElasticacheOld, 1=Elasticache New,  2=>Local Redis
+CACHES = CACHE_OPTIONS[3] # 0=>ElasticacheOld, 1=Elasticache New,  2=>Local Redis
 
 # Password validation
 # https://docs.djangoproject.com/en/2.0/ref/settings/#auth-password-validators

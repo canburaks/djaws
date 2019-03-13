@@ -57,10 +57,10 @@ class UserArchive(Model):
     def commons(self, other):
         return self.movieset.intersection(other.movieset)
     
-    def target_users(self, movie_id, minimum_shared=12, bring=500):
+    def target_users(self, movie_id, minimum_shared=12, bring=1000):
         movie = MovieArchive.objects.get(movie_id=int(movie_id))
-        dummyset = set(cbs.random_sample(movie.dummyset, 8000))
-        real_userset = set(cbs.random_sample(movie.userset, 8000))
+        dummyset = set(cbs.random_sample(movie.dummyset, 15000))
+        real_userset = set(cbs.random_sample(movie.userset, 15000))
 
         userset = dummyset.union(real_userset)
         usersets = UserArchive.objects.filter(user_id__in=userset).defer("ratings")
@@ -70,7 +70,7 @@ class UserArchive(Model):
                 neigbour_and_shared = target_user_dict.update({ user : len(self.commons(user)) })
         return cbs.sort_dict(target_user_dict)[:bring]
 
-    def neighbours(self, target_users_list,minimum_similarity=0.25, bring=25):
+    def neighbours(self, target_users_list,minimum_similarity=0.25, bring=15):
         neigbours_dict = {}
         ubar = self.get_mean()
         for user_tuple in target_users_list:
@@ -92,7 +92,9 @@ class UserArchive(Model):
 
     def prediction(self, movie_id, final="mean"):
         target_users = self.target_users(movie_id)
+        #print(target_users)
         neighbours = self.neighbours(target_users)
+        #print(neighbours)
         if len(neighbours)==0:
             return -1
         v_ratings = []
@@ -109,11 +111,9 @@ class UserArchive(Model):
             m_score = cc.mean_score(cc.carray(v_ratings),
                     cc.carray(v_bars), cc.carray(v_sims))
             #print("mscore", m_score)
-            if m_score>0.1:
-                result = self.get_mean() + m_score
-                #print("result", result )
-                return result
-            return 0
+            result = self.get_mean() + m_score
+            #print("result", result )
+            return result
 
         elif final.startswith("z"):
             for n in neighbours:
@@ -125,10 +125,8 @@ class UserArchive(Model):
             
             z_score = cc.z_score(cc.carray(v_ratings),cc.carray(v_bars),
                     cc.carray(v_sims), cc.carray(v_stdevs))
-            if z_score>0.1:
-                result = self.get_mean() + self.stdev() * z_score
-                return result
-            return 0
+            result = self.get_mean() + self.stdev() * z_score
+            return result
 
 
     def post_prediction(self, movie_id, final):
@@ -136,10 +134,10 @@ class UserArchive(Model):
         #print(f"mean 1: {result}")
         final_result = float()
 
-        #if unsense result, try z-score normalization
         if result==-1:
             return 0
-        elif result>4.9 or result<=0.6:
+        #if unsense result, try z-score normalization
+        elif result>=5 or result<=0:
             z_result =  self.prediction(movie_id, final="z")
             #print(f"z 1: {result}")
 
@@ -151,14 +149,19 @@ class UserArchive(Model):
             final_result = round(result,1)
         
         #fine tuning
-        if final_result>4.6:
-            return final_result - 0.3
-        elif final_result>4.4 and final_result<=4.6:
-            return final_result - 0.2
-        elif final_result>4.2 and final_result<=4.4:
-            return final_result - 0.1
+        if result>4:
+            #How much further from 4.0
+            surplus = final_result - 4
+            #Subtract half of surplus
+            trimmed_result = final_result - (surplus*0.5)
+            return trimmed_result -0.1
+        elif result<4 and result>3.5:
+            surplus = final_result - 3.5
+            trimmed_result = final_result - (surplus*0.5)
+            return trimmed_result
         else:
             return final_result
+
 
 
 class MovSim(Model):

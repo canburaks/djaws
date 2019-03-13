@@ -1,3 +1,8 @@
+
+cbs = Profile.objects.get(id=1)
+tw = Movie.objects.get(id=56782)
+Prediction.objects.filter(profile=cbs, movie=tw)
+
 import _pickle as pickle
 from tqdm import tqdm
 db_folder = "/home/jb/Projects/AWS/database/"

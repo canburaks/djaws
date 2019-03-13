@@ -11,6 +11,7 @@ from graphene_django.converter import convert_django_field
 import graphene
 import graphql_jwt
 from graphql_jwt.decorators import login_required
+from graphene_file_upload.scalars import Upload
 
 from .types import (VideoType, MovieType, ProfileType, PersonType,CustomListType,
         DirectorType, TopicType, ListType, UserType, RatingType)
@@ -18,6 +19,49 @@ from .types import (VideoType, MovieType, ProfileType, PersonType,CustomListType
 @convert_django_field.register(JSONField)
 def convert_json_field_to_string(field, registry=None):
     return graphene.String()
+
+def avatar_upload_path(instance, filename):
+    return "avatars/{0}/{1}".format(instance.id,filename)
+
+    
+class UploadAvatar(graphene.Mutation):
+    success = graphene.Boolean()
+    profile = graphene.Field(ProfileType)
+
+    class Arguments:
+        file = Upload(required=True)
+
+
+    def mutate(self, info, **kwargs):
+        from gql.functions import url_image, get_poster_url
+        from django.core import files
+        from io import BytesIO
+        from PIL import Image
+        if info.context.user.is_authenticated:
+            profile = info.context.user.profile
+            file = info.context.FILES.get("1")
+            if file._size>3500000:
+                return UploadAvatar(success=False, profile=profile)
+            print("file", file.__dict__)
+            file_content_type=file.content_type.split("/")[1]
+            if file_content_type=="png":
+                file_type="PNG"
+            else:
+                file_type="JPEG"
+            print(file_type)
+            #Create BytesIO object for saving Pillow image to there
+            FileIO = BytesIO()
+            #Open image  with Pillow for reducing quality
+            pil = Image.open(file.file)
+            #Save image to BytesIO 
+            pil.save(FileIO, file_type, quality=40, optimize=True)
+
+            profile.avatar.save(file._name, files.File(FileIO))
+            print("avatar saved")
+            return UploadAvatar(success=True, profile=profile)
+        else:
+            return UploadAvatar(success=False)
+        # do something with your file
 
 
 class ProfileInfo(graphene.Mutation):
@@ -27,25 +71,29 @@ class ProfileInfo(graphene.Mutation):
         username = graphene.String(required=True) #for check
         name = graphene.String(required=False)
         bio = graphene.String(required=False)
+        country = graphene.String(required=False)
 
-    def mutate(self,info,username, name, bio):
+    def mutate(self,info,username, name, bio, country):
         if info.context.user.is_authenticated:
             user = info.context.user
             if user.profile.username==username:
                 profile = Profile.objects.get(username=username)
-                if name and bio:
-                    profile.name = name
-                    profile.bio = bio
-                    profile.save()
-                    return ProfileInfo(profile=profile)
-                elif name and (not bio):
-                    profile.name = name
-                    profile.save()
-                    return ProfileInfo(profile=profile)
-                elif bio and (not name):
-                    profile.bio = bio
-                    profile.save()
-                    return ProfileInfo(profile=profile)
+                entries = {"name":name, "bio":bio, "country":country }
+                print("manual", name, bio, country)
+                for entry_name in entries.keys():
+                    entry = entries.get(entry_name)
+                    if entry_name=="name" and entry!=None:
+                        print("entry", entry)
+                        profile.name = entry
+                    elif entry_name=="bio" and entry!=None:
+                        print("entry", entry)
+                        profile.bio = entry
+                    elif entry_name=="country" and entry!=None:
+                        print("entry", entry)
+                        if len(entry)==2:
+                            profile.country = entry.upper()
+                profile.save()
+                return ProfileInfo(profile=profile)
             else:
                 raise Exception("Not the owner of profile")
         else:

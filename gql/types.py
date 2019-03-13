@@ -1,4 +1,4 @@
-from items.models import Rating,Movie, List, MovieImage, Video, Topic
+from items.models import Rating,Movie, List, MovieImage, Video, Topic, Prediction
 from persons.models import Person, PersonImage, Director, Crew
 from persons.profile import Profile, Follow
 from django.contrib.auth import get_user_model
@@ -7,6 +7,7 @@ from django_mysql.models import JSONField
 from graphene_django.types import DjangoObjectType
 from graphene_django.converter import convert_django_field
 from django.db.models import Q
+from django_countries import countries
 
 @convert_django_field.register(JSONField)
 def convert_json_field_to_string(field, registry=None):
@@ -24,7 +25,21 @@ movie_defer = ("imdb_id","tmdb_id","data",
 
 
 
+class CountryType(graphene.ObjectType):
+    country = graphene.List(graphene.String)
+    
 
+    def __init__(self,code=None, num=None):
+        self.code = code
+        self.num = num
+
+    def resolve_country(self, info):
+        if self.code:
+            return dict(countries).get(self.code)
+        elif self.num:
+            if list(countries)[self.num]:
+                c =  list(countries)[self.num]
+                return [c.name, c.code]
 
 class VideoType(DjangoObjectType):
     tags = graphene.List(graphene.String)
@@ -430,6 +445,10 @@ class DirectorType(DjangoObjectType):
             return len(profile.ratings.items())
         return 0
 
+class PredictionType(DjangoObjectType):
+    class Meta:
+        model = Prediction
+
 
 
 class DirectorPersonMixType(DjangoObjectType):
@@ -662,7 +681,7 @@ class ProfileType(DjangoObjectType):
     token = graphene.String()
     is_self = graphene.Boolean()
     avatar = graphene.String()
-    country = graphene.String()
+    country = graphene.List(graphene.String)
 
     bookmarks = graphene.List(MovieType)
     ratings = graphene.List(RatingType)
@@ -686,20 +705,25 @@ class ProfileType(DjangoObjectType):
     following_profiles =  graphene.List("gql.types.ProfileType")
 
     followers = graphene.List("gql.types.ProfileType")
+    ratingset = graphene.types.json.JSONString()
 
     class Meta:
         model = Profile
+    
+    def resolve_ratingset(self, info):
+        return self.ratings
+
     def resolve_avatar(self, info, *_):
         if self.avatar and hasattr(self.avatar, "url"):
             return self.avatar.url
         return "https://s3.eu-west-2.amazonaws.com/cbs-static/static/images/user-avatar.svg"
 
     def resolve_latest_ratings(self, info, *_):
-        return self.rates.select_related("movie").order_by("updated_at")[:5]
+        return self.rates.select_related("movie").order_by("-created_at")[:5]
 
     def resolve_country(self, info, *_):
         if self.country and hasattr(self.country, "name"):
-            return self.country.name
+            return [self.country.name, self.country.code]
 
     def resolve_is_self(self, info, *_):
         user = info.context.user
@@ -711,7 +735,7 @@ class ProfileType(DjangoObjectType):
         return self.bookmarks.all().defer(*movie_defer)
 
     def resolve_ratings(self, info, *_):
-        return self.rates.select_related("movie").all()
+        return self.rates.select_related("movie").order_by("-created_at").all()
         #return Rating.objects.select.related("movie").filter(profile=self).all()
         
 
@@ -965,6 +989,7 @@ class CustomMovieType(graphene.ObjectType):
     isBookmarked = graphene.Boolean()
     isFaved = graphene.Boolean()
     #liked = graphene.List(ProfileType)
+    prediction_history = graphene.Float()
     viewer = graphene.Field(ProfileType)
     viewer_rating = graphene.Float()
     viewer_points = graphene.Int()
@@ -986,7 +1011,17 @@ class CustomMovieType(graphene.ObjectType):
 
     def resolve_year(self,info):
         return self.movie.year
-    
+
+    def resolve_prediction_history(self, info):
+        if info.context.user.is_authenticated:
+            profile = info.context.user.profile
+            is_eligible = profile.prediction_history_eligibility(self.movie)
+            if is_eligible==True:
+                return 0
+            else:
+                return Prediction.objects.filter(profile=profile, movie=self.movie)[0].prediction
+
+
     def resolve_poster(self,info):
         if self.movie.poster!="" and self.movie.poster!=None:
             return self.movie.poster.url

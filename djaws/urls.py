@@ -31,6 +31,7 @@ from persons.views import HomeList
 from django.views.generic import TemplateView
 from django.contrib import auth
 from filebrowser.sites import site
+from graphene_file_upload.django import FileUploadGraphQLView
 
 def logout_view(request):
   auth.logout(request)
@@ -48,7 +49,9 @@ urlpatterns = [
     path(r'', TemplateView.as_view(template_name="index.html")),
     #path("",HomeList.as_view(), name="home"),
 
-    re_path(r'^graphql', csrf_exempt(GraphQLView.as_view(graphiql=True))),
+    re_path(r'^graphql', csrf_exempt(FileUploadGraphQLView.as_view(graphiql=True))),
+    #re_path(r'^graphql', csrf_exempt(GraphQLView.as_view(graphiql=True))),
+
     re_path(r'^(?:.*)/?$', TemplateView.as_view(template_name="index.html")),
 ]
 """

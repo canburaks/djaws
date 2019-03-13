@@ -4,6 +4,8 @@ from django.contrib.auth.models import User
 from django.db.models.signals import post_save
 from django_mysql.models import JSONField
 from django_countries.fields import CountryField
+from imagekit.models import ImageSpecField
+from imagekit.processors import ResizeToFill
 
 FOLLOW_TYPE = (
     ('u', 'Profile'),
@@ -23,10 +25,10 @@ class Profile(models.Model):
     name = models.CharField(max_length=40, null=True, blank=True)
     bio = models.CharField(default="...", max_length=140, null=True, blank=True)
     country = CountryField(blank=True, null=True)
-    avatar = models.ImageField(blank=True, upload_to=avatar_upload_path)
-
+    avatar = models.ImageField(upload_to=avatar_upload_path, blank=True, null=True)
+    
     email = models.EmailField(max_length=50, null=True)
-    joined = models.DateField(null=True, blank=True)
+    joined = models.DateField(auto_now_add=True, null=True)
     born = models.DateField(null=True, blank=True)
 
 
@@ -66,6 +68,7 @@ class Profile(models.Model):
     @property
     def points(self):
         return len(self.ratings.keys())
+    
 
     def isBookmarked(self,target):
         return target in self.bookmarks.all()
@@ -147,15 +150,43 @@ class Profile(models.Model):
         if zscore:
             final="zscore"
         movie_id = target.id
+        #check if user rate it before
         if movie_id in self.ratings.keys():
             return 0
-        ua = self.archive
-        result = ua.post_prediction(movie_id, final)
-        points = self.points
+        #check prediction history of user
+        print("before eligv")
+        is_eligible = self.prediction_history_eligibility(target)
+        print("eligiblity", is_eligible)
+        if is_eligible:
+            ua = self.archive
+            result = ua.post_prediction(movie_id, final)
+            points = self.points
 
-        pred = Prediction.objects.create(profile=self, profile_points=points,
-                movie=target, prediction=result )
-        return round(result,1)
+            pred = Prediction.objects.create(profile=self, profile_points=points,
+                    movie=target, prediction=result )
+            print(result)
+            return round(result,1)
+        elif is_eligible==False:
+            prediction_from_history = Prediction.objects.filter(profile=self, movie=target)[0]
+            print(prediction_from_history.prediction)
+            return round(prediction_from_history.prediction,1)          
+
+    def prediction_history_eligibility(self, target):
+        """
+        Checks prediction history of user, if there is not any prediction about the same movie 
+        or user rated at least 10 movies after the previous prediction it returns true, otherwise false
+        """
+        from items.models import Prediction
+        current_points = self.points
+        #Check previous prediction
+        if Prediction.objects.filter(profile=self, movie=target).exists():
+            previous_prediction = Prediction.objects.filter(profile=self, movie=target)[0]
+            if current_points - previous_prediction.profile_points>=10 or previous_prediction.prediction<=0:
+                return True
+            else:
+                return False
+        return True
+        
 
 
 class Follow(models.Model):
